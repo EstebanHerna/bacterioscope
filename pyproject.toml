@@ -44,6 +44,7 @@ api = [
     "uvicorn>=0.24",
     "pydantic>=2.0",
     "httpx>=0.25",
+    "python-multipart>=0.0.9",
 ]
 ui = [
     "streamlit>=1.28",
