@@ -31,7 +31,9 @@ def download_file(url: str, dest: Path) -> None:
         response.raise_for_status()
         total = int(response.headers.get("content-length", 0))
         if total > _MAX_DOWNLOAD_BYTES:
-            raise ValueError(f"Remote file is {total} bytes, exceeds {_MAX_DOWNLOAD_BYTES} byte cap")
+            raise ValueError(
+                f"Remote file is {total} bytes, exceeds {_MAX_DOWNLOAD_BYTES} byte cap"
+            )
         downloaded = 0
         with open(dest, "wb") as f:
             for chunk in response.iter_bytes(chunk_size=8192):

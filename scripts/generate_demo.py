@@ -40,13 +40,14 @@ POSITIONS: list[tuple[int, int]] = [
 ]
 
 # (antibiotic, zone_radius_px, category, color_BGR)
+# Colors match the clinical palette in app.py (BGR order for OpenCV)
 DISKS = [
-    ("Meropenem",     76, "S", (30, 180, 30)),
-    ("Ciprofloxacin", 62, "I", (20, 180, 220)),
-    ("Ampicillin",    36, "R", (30, 30, 210)),
-    ("Ceftriaxone",   82, "S", (30, 180, 30)),
-    ("Imipenem",      64, "I", (20, 180, 220)),
-    ("Gentamicin",    44, "S", (30, 180, 30)),
+    ("Meropenem",     76, "S", (172, 239, 134)),   # #86efac green
+    ("Ciprofloxacin", 62, "I", (138, 222, 253)),   # #fde68a amber
+    ("Ampicillin",    36, "R", (165, 165, 252)),   # #fca5a5 red
+    ("Ceftriaxone",   82, "S", (172, 239, 134)),
+    ("Imipenem",      64, "I", (138, 222, 253)),
+    ("Gentamicin",    44, "S", (172, 239, 134)),
 ]
 
 
@@ -97,10 +98,10 @@ def _make_base_plate() -> np.ndarray:
 
 def _add_step_label(img: np.ndarray, text: str) -> np.ndarray:
     out = img.copy()
-    cv2.rectangle(out, (0, SIZE - 40), (SIZE, SIZE), (22, 22, 22), -1)
+    cv2.rectangle(out, (0, SIZE - 44), (SIZE, SIZE), (18, 20, 26), -1)
     cv2.putText(
-        out, text, (12, SIZE - 13),
-        cv2.FONT_HERSHEY_SIMPLEX, 0.52, (210, 210, 210), 1, cv2.LINE_AA,
+        out, text, (14, SIZE - 15),
+        cv2.FONT_HERSHEY_SIMPLEX, 0.50, (168, 188, 216), 1, cv2.LINE_AA,
     )
     return out
 
