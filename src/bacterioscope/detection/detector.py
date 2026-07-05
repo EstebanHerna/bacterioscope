@@ -89,8 +89,8 @@ class DiskDetector:
             cv2.HOUGH_GRADIENT,
             dp=1.2,
             minDist=50,
-            param1=100,
-            param2=30,
+            param1=50,
+            param2=20,
             minRadius=10,
             maxRadius=40,
         )

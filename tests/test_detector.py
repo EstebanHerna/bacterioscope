@@ -71,3 +71,37 @@ class TestDiskDetectorHoughMode:
         result_a = [(d.center_x, d.center_y) for d in self.detector.detect(image)]
         result_b = [(d.center_x, d.center_y) for d in self.detector.detect(image)]
         assert result_a == result_b
+
+    def test_detects_six_disks_on_synthetic_plate(self) -> None:
+        """Regression: param1=50/param2=20 must detect all 6 disks on the demo plate."""
+        plate = _make_synthetic_plate()
+        disks = self.detector.detect(plate)
+        assert len(disks) == 6, (
+            f"Expected 6 disks on synthetic plate, got {len(disks)}. "
+            "HoughCircles param1/param2 may need re-tuning."
+        )
+
+    def test_detected_disk_radii_in_expected_range(self) -> None:
+        plate = _make_synthetic_plate()
+        for disk in self.detector.detect(plate):
+            assert 10 <= disk.radius_px <= 40
+
+
+def _make_synthetic_plate(size: int = 540) -> np.ndarray:
+    center = (size // 2, size // 2)
+    plate_r = 252
+    disk_r = 14
+    angles = [90, 30, 330, 270, 210, 150]
+    positions = [
+        (center[0] + int(170 * np.cos(np.radians(a))),
+         center[1] - int(170 * np.sin(np.radians(a))))
+        for a in angles
+    ]
+    img = np.full((size, size, 3), [38, 38, 38], dtype=np.uint8)
+    agar = np.full((size, size, 3), [136, 165, 186], dtype=np.uint8)
+    mask = np.zeros((size, size), dtype=np.uint8)
+    cv2.circle(mask, center, plate_r, 255, -1)
+    img[mask > 0] = agar[mask > 0]
+    for cx, cy in positions:
+        cv2.circle(img, (cx, cy), disk_r, (232, 232, 225), -1)
+    return img
