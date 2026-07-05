@@ -1,4 +1,26 @@
-"""FastAPI application for the BacterioScope pipeline.
+"""FastAPI REST API for the BacterioScope pipeline.
+
+This module exposes the analysis pipeline as an HTTP service so that any
+program — a mobile app, a laboratory information system, or another service —
+can submit a plate photograph and receive S/I/R classifications as JSON,
+without needing to install Python locally.
+
+Endpoints
+---------
+``GET /health``
+    Returns ``{"status": "ok", "version": "0.1.0"}``.  Use this to check
+    that the service is running before sending images.
+``POST /analyze``
+    Accepts a multipart form upload with a JPEG, PNG, BMP, or TIFF image.
+    Returns the full analysis result (disk count, zone diameters, S/I/R
+    categories) as JSON.
+
+Security
+--------
+- Content-type is validated against an allowlist before the image is read.
+- File size is capped at 50 MB.
+- All error responses from unhandled exceptions return a generic 500 message
+  to avoid leaking internal stack traces.
 
 Run with:
     uvicorn bacterioscope.api.routes:app --reload
@@ -34,6 +56,15 @@ _pipeline: BacterioScopePipeline | None = None
 
 
 def _get_pipeline() -> BacterioScopePipeline:
+    """Return the shared pipeline instance, creating it on the first request.
+
+    Lazy initialisation avoids loading the YOLOv8 model at import time so
+    the server starts fast.  The singleton is reused for all subsequent
+    ``/analyze`` requests.
+
+    Returns:
+        The global ``BacterioScopePipeline`` instance.
+    """
     global _pipeline
     if _pipeline is None:
         _pipeline = BacterioScopePipeline(PipelineConfig())
