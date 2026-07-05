@@ -8,11 +8,16 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import cv2
 import streamlit as st
 
-from bacterioscope.classification.clsi import SusceptibilityResult
+from bacterioscope.classification.clsi import (
+    CLSI_2023_ENTEROBACTERIACEAE,
+    CLSIClassifier,
+    SusceptibilityResult,
+)
 from bacterioscope.pipeline import AnalysisResult, BacterioScopePipeline, PipelineConfig
 
 _PLATE_SVG = (
@@ -29,6 +34,9 @@ _PLATE_SVG = (
     '<circle cx="23" cy="30" r="4.5" fill="rgba(255,255,255,0.07)"/>'
     '</svg>'
 )
+
+_UNASSIGNED = "-- Unassigned --"
+_ANTIBIOTIC_OPTIONS: list[str] = [_UNASSIGNED] + sorted(CLSI_2023_ENTEROBACTERIACEAE.keys())
 
 _CSS = """
 <style>
@@ -155,7 +163,7 @@ _CSS = """
 /* ---- Divider ---- */
 .bs-hr { border: none; border-top: 1px solid rgba(255,255,255,0.055); margin: 16px 0; }
 
-/* ---- Table ---- */
+/* ---- Static results table (YOLOv8 mode) ---- */
 .bs-table { width: 100%; border-collapse: collapse; font-size: 0.845rem; }
 .bs-table thead tr { border-bottom: 1px solid rgba(255,255,255,0.055); }
 .bs-table th {
@@ -183,6 +191,17 @@ _CSS = """
 .col-name { color: #c0cce0; font-weight: 500; }
 .col-diam { color: #5a6a80; font-variant-numeric: tabular-nums; }
 .col-cat  { text-align: right; }
+
+/* ---- Hough assignment table ---- */
+.bs-th {
+  font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.09em; color: #3a4560; padding-bottom: 8px;
+}
+.bs-td {
+  padding-top: 8px; font-size: 0.82rem; color: #5a6a80;
+  font-variant-numeric: tabular-nums;
+}
+.bs-td-badge { padding-top: 8px; text-align: right; }
 
 /* ---- Badge ---- */
 .bs-badge {
@@ -245,6 +264,63 @@ def _build_pipeline(plate_mm: float, organism: str) -> BacterioScopePipeline:
     )
 
 
+def reclassify_with_assignment(
+    zone_mm: float,
+    antibiotic: str,
+    classifier: CLSIClassifier,
+    disk_label: str = "",
+) -> SusceptibilityResult:
+    """Return a SusceptibilityResult for the given zone and antibiotic assignment.
+
+    If antibiotic is the unassigned sentinel or empty, returns UNKNOWN using
+    disk_label as the antibiotic field so the disk identity is preserved.
+    """
+    if not antibiotic or antibiotic == _UNASSIGNED:
+        return SusceptibilityResult(
+            antibiotic=disk_label or antibiotic,
+            zone_diameter_mm=zone_mm,
+            category="UNKNOWN",
+            breakpoints={},
+        )
+    return classifier.classify(antibiotic, zone_mm)
+
+
+def _assignment_key(i: int) -> str:
+    return f"bs_antibiotic_{i}"
+
+
+def _sync_for_new_image(image_id: str) -> None:
+    if st.session_state.get("bs_image_id") == image_id:
+        return
+    st.session_state["bs_image_id"] = image_id
+    st.session_state.pop("bs_result", None)
+    stale = [k for k in st.session_state if k.startswith("bs_antibiotic_")]
+    for k in stale:
+        del st.session_state[k]
+
+
+def _run_pipeline(
+    pipeline: BacterioScopePipeline, uploaded: Any
+) -> AnalysisResult | None:
+    if "bs_result" in st.session_state:
+        result: AnalysisResult = st.session_state["bs_result"]
+        return result
+    suffix = Path(uploaded.name).suffix.lower() or ".png"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(uploaded.read())
+        tmp_path = Path(tmp.name)
+    try:
+        with st.spinner("Analyzing..."):
+            result = pipeline.analyze(tmp_path)
+        st.session_state["bs_result"] = result
+        return result
+    except (ValueError, FileNotFoundError) as exc:
+        st.error(f"Analysis failed: {exc}")
+        return None
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+
 def _sidebar() -> tuple[float, str]:
     st.sidebar.markdown(
         '<div class="bs-sb-brand">BacterioScope<span class="bs-sb-v">v0.1</span></div>',
@@ -274,7 +350,7 @@ def _mode_indicator(is_hough: bool) -> None:
         cls, title = "bs-mode", "Geometric detection mode (Hough circles)"
         desc = (
             "Antibiotic identification requires the trained YOLOv8 model (Phase 1). "
-            "Zone diameters are measured; S/I/R classification is pending disk labeling."
+            "Zone diameters are measured. Assign antibiotics below to compute S/I/R."
         )
     else:
         cls, title = "bs-mode bs-mode--ok", "YOLOv8 model active"
@@ -308,6 +384,23 @@ def _metric_cards(classifications: list[SusceptibilityResult]) -> None:
     st.markdown(f'<div class="bs-metrics">{cards}</div>', unsafe_allow_html=True)
 
 
+def _effective_classifications(
+    result: AnalysisResult,
+    classifier: CLSIClassifier,
+) -> list[SusceptibilityResult]:
+    if not _is_hough_mode(result):
+        return result.classifications
+    effective = []
+    for i, zone in enumerate(result.zones):
+        chosen = st.session_state.get(_assignment_key(i), _UNASSIGNED)
+        effective.append(
+            reclassify_with_assignment(
+                zone.diameter_mm, chosen, classifier, result.disks[i].label
+            )
+        )
+    return effective
+
+
 def _results_table(classifications: list[SusceptibilityResult]) -> None:
     if not classifications:
         st.markdown(
@@ -335,7 +428,46 @@ def _results_table(classifications: list[SusceptibilityResult]) -> None:
     )
 
 
-def _download_button(result: AnalysisResult) -> None:
+def _hough_table(result: AnalysisResult, effective: list[SusceptibilityResult]) -> None:
+    if not result.zones:
+        st.markdown(
+            f'<div class="bs-empty">{_PLATE_SVG}'
+            '<div class="e-title">No antibiotic disks detected</div>'
+            '<div class="e-desc">The pipeline did not find paper disks in this image. '
+            "Try a higher-contrast raw plate photograph with clearly visible disk halos.</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        return
+    h1, h2, h3, h4 = st.columns([1, 2, 5, 2])
+    h1.markdown('<div class="bs-th">Disk</div>', unsafe_allow_html=True)
+    h2.markdown('<div class="bs-th">Zone</div>', unsafe_allow_html=True)
+    h3.markdown('<div class="bs-th">Antibiotic</div>', unsafe_allow_html=True)
+    h4.markdown('<div class="bs-th">Category</div>', unsafe_allow_html=True)
+    st.markdown('<hr class="bs-hr" style="margin:2px 0 4px">', unsafe_allow_html=True)
+    for i, zone in enumerate(result.zones):
+        c1, c2, c3, c4 = st.columns([1, 2, 5, 2])
+        c1.markdown(
+            f'<div class="bs-td">{result.disks[i].label}</div>', unsafe_allow_html=True
+        )
+        c2.markdown(
+            f'<div class="bs-td">{zone.diameter_mm:.1f} mm</div>', unsafe_allow_html=True
+        )
+        c3.selectbox(
+            f"antibiotic_{i}",
+            _ANTIBIOTIC_OPTIONS,
+            key=_assignment_key(i),
+            label_visibility="collapsed",
+        )
+        c4.markdown(
+            f'<div class="bs-td-badge">{_category_badge(effective[i].category)}</div>',
+            unsafe_allow_html=True,
+        )
+
+
+def _download_button(
+    result: AnalysisResult, classifications: list[SusceptibilityResult]
+) -> None:
     lines = (
         ["# BacterioScope Analysis Report", "",
          f"Calibration: {result.px_per_mm:.3f} px/mm",
@@ -343,15 +475,17 @@ def _download_button(result: AnalysisResult) -> None:
          "| Antibiotic | Zone (mm) | Category |",
          "|------------|-----------|----------|"]
         + [f"| {c.antibiotic} | {c.zone_diameter_mm:.1f} | {c.category} |"
-           for c in result.classifications]
+           for c in classifications]
     )
     st.download_button(
         "Download report", "\n".join(lines), "bacterioscope_report.md", "text/markdown"
     )
 
 
-def _show_results(result: AnalysisResult) -> None:
+def _show_results(result: AnalysisResult, classifier: CLSIClassifier) -> None:
     col_img, col_data = st.columns([10, 9], gap="large")
+    is_hough = _is_hough_mode(result)
+    effective = _effective_classifications(result, classifier)
     with col_img:
         st.markdown('<div class="bs-label">Annotated plate</div>', unsafe_allow_html=True)
         if result.annotated_image is not None:
@@ -364,13 +498,17 @@ def _show_results(result: AnalysisResult) -> None:
         )
     with col_data:
         st.markdown('<div class="bs-label">Classification</div>', unsafe_allow_html=True)
-        _mode_indicator(_is_hough_mode(result))
-        _metric_cards(result.classifications)
-        if result.classifications:
+        _mode_indicator(is_hough)
+        _metric_cards(effective)
+        has_data = bool(result.zones)
+        if has_data:
             st.markdown('<hr class="bs-hr">', unsafe_allow_html=True)
-        _results_table(result.classifications)
-        if result.classifications:
-            _download_button(result)
+        if is_hough:
+            _hough_table(result, effective)
+        else:
+            _results_table(result.classifications)
+        if has_data:
+            _download_button(result, effective)
 
 
 def main() -> None:
@@ -392,8 +530,8 @@ def main() -> None:
         "plate", type=["jpg", "jpeg", "png", "bmp", "tiff"], label_visibility="collapsed"
     )
     st.markdown(
-        '<div class="bs-upload-hint">Upload a raw, unprocessed plate photograph (JPEG, PNG, TIFF). '
-        "Pre-annotated images will produce overlapping annotations.</div>",
+        '<div class="bs-upload-hint">Upload a raw, unprocessed plate photograph '
+        "(JPEG, PNG, TIFF). Pre-annotated images will produce overlapping annotations.</div>",
         unsafe_allow_html=True,
     )
     if uploaded is None:
@@ -405,21 +543,12 @@ def main() -> None:
             unsafe_allow_html=True,
         )
         return
-    with tempfile.NamedTemporaryFile(
-        suffix=Path(uploaded.name).suffix.lower() or ".png", delete=False
-    ) as tmp:
-        tmp.write(uploaded.read())
-        tmp_path = Path(tmp.name)
-    try:
-        with st.spinner("Analyzing..."):
-            result = pipeline.analyze(tmp_path)
-    except (ValueError, FileNotFoundError) as exc:
-        st.error(f"Analysis failed: {exc}")
+    _sync_for_new_image(f"{uploaded.name}:{uploaded.size}")
+    result = _run_pipeline(pipeline, uploaded)
+    if result is None:
         return
-    finally:
-        tmp_path.unlink(missing_ok=True)
     st.markdown('<div class="bs-panel">', unsafe_allow_html=True)
-    _show_results(result)
+    _show_results(result, pipeline.classifier)
     st.markdown("</div>", unsafe_allow_html=True)
 
 
