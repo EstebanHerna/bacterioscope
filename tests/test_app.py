@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from bacterioscope.app import _UNASSIGNED, reclassify_with_assignment
+from bacterioscope._app_logic import _UNASSIGNED, reclassify_with_assignment
 from bacterioscope.classification.clsi import CLSIClassifier
 
 

@@ -13,11 +13,12 @@ from typing import Any
 import cv2
 import streamlit as st
 
-from bacterioscope.classification.clsi import (
-    CLSI_2023_ENTEROBACTERIACEAE,
-    CLSIClassifier,
-    SusceptibilityResult,
+from bacterioscope._app_logic import (
+    _ANTIBIOTIC_OPTIONS,
+    _UNASSIGNED,
+    reclassify_with_assignment,
 )
+from bacterioscope.classification.clsi import CLSIClassifier, SusceptibilityResult
 from bacterioscope.pipeline import AnalysisResult, BacterioScopePipeline, PipelineConfig
 
 _PLATE_SVG = (
@@ -34,9 +35,6 @@ _PLATE_SVG = (
     '<circle cx="23" cy="30" r="4.5" fill="rgba(255,255,255,0.07)"/>'
     '</svg>'
 )
-
-_UNASSIGNED = "-- Unassigned --"
-_ANTIBIOTIC_OPTIONS: list[str] = [_UNASSIGNED] + sorted(CLSI_2023_ENTEROBACTERIACEAE.keys())
 
 _CSS = """
 <style>
@@ -263,26 +261,6 @@ def _build_pipeline(plate_mm: float, organism: str) -> BacterioScopePipeline:
         PipelineConfig(plate_diameter_mm=plate_mm, organism_group=organism)
     )
 
-
-def reclassify_with_assignment(
-    zone_mm: float,
-    antibiotic: str,
-    classifier: CLSIClassifier,
-    disk_label: str = "",
-) -> SusceptibilityResult:
-    """Return a SusceptibilityResult for the given zone and antibiotic assignment.
-
-    If antibiotic is the unassigned sentinel or empty, returns UNKNOWN using
-    disk_label as the antibiotic field so the disk identity is preserved.
-    """
-    if not antibiotic or antibiotic == _UNASSIGNED:
-        return SusceptibilityResult(
-            antibiotic=disk_label or antibiotic,
-            zone_diameter_mm=zone_mm,
-            category="UNKNOWN",
-            breakpoints={},
-        )
-    return classifier.classify(antibiotic, zone_mm)
 
 
 def _assignment_key(i: int) -> str:
