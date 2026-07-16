@@ -4,184 +4,156 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![CLSI M100-Ed33](https://img.shields.io/badge/CLSI-M100--Ed33%20(2023)-orange.svg)](https://clsi.org)
+[![BDIC 2026](https://img.shields.io/badge/BDIC-2026-blueviolet.svg)](https://innovacion.uniandes.edu.co)
 
-**Automated antimicrobial resistance detection from Kirby-Bauer disk diffusion photographs.**
-
-BacterioScope takes a photograph of a standard antibiogram plate and returns, within seconds, the detected antibiotic disks, their inhibition zone diameters in millimetres, and an S/I/R classification against CLSI M100-Ed33 (2023) breakpoints. Built for clinical microbiology labs in low-resource settings where automated AST systems (VITEK, MicroScan, Phoenix) are unavailable.
-
-![BacterioScope pipeline demo](docs/pipeline_demo.gif)
+> **"La tecnología al servicio de la salud pública."**
 
 ---
 
-## Background — what is a Kirby-Bauer antibiogram?
+**BacterioScope** es un sistema de visión computacional de código abierto que, a partir de una sola fotografía de una placa de antibiograma Kirby-Bauer tomada con cualquier cámara, entrega el reporte de sensibilidad/resistencia (S/I/R) completo sin intervención humana: detecta cada disco, lee automáticamente el antibiótico impreso, mide la zona de inhibición en mm y la clasifica según CLSI. Pensado para laboratorios de mediana y baja complejidad en América Latina sin acceso a VITEK/MicroScan.
 
-A **Kirby-Bauer disk diffusion test** (also called an antibiogram) is the standard method used in clinical labs worldwide to determine whether a bacterium is resistant or susceptible to antibiotics. Here is how it works:
-
-1. A Petri dish filled with agar (a jelly-like growth medium) is spread with the bacteria isolated from the patient.
-2. Small paper disks, each pre-soaked in a different antibiotic, are placed on the agar surface.
-3. The plate is incubated overnight at 37 °C.
-4. Antibiotics diffuse outward from each disk. Where the concentration is high enough, bacteria cannot grow — leaving a clear circular area called the **inhibition zone**.
-5. A technician measures the **diameter of the inhibition zone** in millimetres with a ruler and compares it against a reference table published by CLSI.
-
-The further the inhibition zone extends, the more effective the antibiotic is against that particular bacterium.
-
-### What do S, I, and R mean?
-
-| Category | Full name | Clinical meaning |
-|---|---|---|
-| **S** | Susceptible | Standard dosing is expected to be effective. |
-| **I** | Intermediate | May work at higher doses or at infection sites where the drug concentrates (e.g. urinary tract for ciprofloxacin). |
-| **R** | Resistant | The antibiotic is unlikely to work at achievable concentrations. Choose a different drug. |
+Selected for the **Biodiscovery Design Innovation Challenge (BDIC) 2026** — Universidad de los Andes / Nodo de Innovación.
 
 ---
 
-## How BacterioScope works
+## The problem
+
+Antimicrobial resistance (AMR) is one of the leading public health threats of the 21st century. In Latin America, most clinical microbiology laboratories rely on the Kirby-Bauer disk diffusion test as their primary susceptibility method — a technique that is affordable and standardized, but whose final step (measuring inhibition zone diameters with a hand ruler and looking up breakpoints in a printed table) is slow, operator-dependent, and subject to human error.
+
+Automated susceptibility systems (VITEK 2, BD Phoenix, MicroScan) cost upward of USD 80 000 and require continuous reagent supply chains that many hospitals in the region cannot sustain. The result: variable, delayed AST reports that slow appropriate antibiotic prescribing.
+
+BacterioScope eliminates the manual measurement step by turning any camera into a calibrated measuring device.
+
+---
+
+## How it works
 
 ```
 Photograph of plate (JPEG / PNG / TIFF)
-    │
-    ▼
- 1. CALIBRATION  ──────  Detects the plate rim with Hough Circle Transform.
-    │                     Computes pixels-per-mm so all measurements are in
-    │                     real physical units, regardless of camera distance.
-    ▼
- 2. DISK DETECTION ────  Locates each paper antibiotic disk.
-    │                     • Phase 1 (planned): YOLOv8 reads the printed label
-    │                       and returns the antibiotic name automatically.
-    │                     • Phase 0 (current): Hough circles find disk positions;
-    │                       the user assigns antibiotic names in the UI.
-    ▼
- 3. ZONE SEGMENTATION ─  For each disk, crops a region of interest, applies
-    │                     Otsu thresholding to separate the clear inhibition zone
-    │                     from the bacterial lawn, and fits a circle to measure
-    │                     the zone diameter in millimetres.
-    ▼
- 4. CLASSIFICATION ────  Looks up each antibiotic in the CLSI M100-Ed33 (2023)
-    │                     breakpoint table and assigns S / I / R.
-    ▼
- 5. REPORT ────────────  Returns an annotated image, a JSON result, and a
-                          downloadable Markdown report.
+    |
+    v
+ 1. CALIBRATION      Detects the plate rim with Hough Circle Transform.
+    |                Computes px/mm using the 90 mm plate diameter so all
+    |                measurements are in real physical units.
+    v
+ 2. DISK DETECTION   Locates each antibiotic disk.
+    |                Phase 0: HoughCircles geometric fallback.
+    |                Phase 2: YOLOv8 detects each disk AND reads the printed
+    |                antibiotic label — no manual assignment needed.
+    v
+ 3. ZONE SEGMENTATION  Crops an ROI around each disk, applies Otsu
+    |                  thresholding to separate the inhibition zone from
+    |                  the bacterial lawn, fits a contour, and reports
+    |                  the zone diameter in mm.
+    v
+ 4. CLASSIFICATION   Looks up the antibiotic in the CLSI M100-Ed33 (2023)
+    |                breakpoint table and assigns S / I / R.
+    v
+ 5. REPORT           Annotated image + JSON result + downloadable report.
 ```
+
+### What S, I, R mean
+
+| Category | Full name | Clinical meaning |
+|---|---|---|
+| **S** | Susceptible | Standard dosing expected to be effective. |
+| **I** | Intermediate | May work at higher doses or at sites where the drug concentrates. |
+| **R** | Resistant | Unlikely to work at achievable concentrations. Choose a different drug. |
 
 ---
 
-## Try the demo (no coding needed)
+## Current state — Phase 0 complete
 
-If you only want to try the interactive web interface:
+The end-to-end pipeline is fully operational on the Hough + Otsu baseline.
+
+| Component | Status |
+|---|---|
+| Plate calibration (px/mm via Hough rim detection) | Complete |
+| Disk detection — HoughCircles fallback | Complete |
+| Zone segmentation — Otsu + watershed + contour fitting | Complete |
+| CLSI M100-Ed33 2023 classifier — 15 antibiotics, Enterobacteriaceae | Complete |
+| Streamlit demo (upload image, assign antibiotic, live S/I/R) | Complete |
+| Command-line interface (Typer + Rich) | Complete |
+| REST API (FastAPI, `/health` + `/analyze`) | Complete |
+| Clinical evaluation module (CA, EA, VME, ME, mE — ISO 20776-2) | Complete |
+| Test suite | 107 tests, all passing |
+| CI (GitHub Actions) | Green on Python 3.10, 3.11, 3.12 |
+| Static analysis | ruff, mypy strict, bandit, gitleaks |
+
+**Phase 0 limitation:** disk detection uses geometric circles (no ML) and the antibiotic name is assigned manually in the UI. Phases 2 and 3 remove both constraints.
+
+---
+
+## Roadmap
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for full detail.
+
+| Phase | Scope | Status |
+|---|---|---|
+| **F0** | End-to-end pipeline, Hough baseline, CLSI classifier, Streamlit demo, CLI, API, evaluation module, 107 tests, CI | **Complete** |
+| **F1** | Curate and annotate the Dryad/UZH public dataset (225 Gram-negative isolates with clinical ground truth) | Planned |
+| **F2** | Train YOLOv8 to detect each disk and read its printed antibiotic label — eliminates manual assignment | Planned |
+| **F3** | Calibrate mm measurement using the 6 mm disk as physical reference; validate EA >=90%, CA >=90%, VME <=1.5% | Planned |
+| **F4** | Open-source packaging, public deployable demo, peer-reviewed documentation | Planned |
+
+---
+
+## Objective metrics (target at F3 completion)
+
+| Metric | Description | Target |
+|---|---|---|
+| **EA** | Essential Agreement — measured diameter within ±2 mm of reference | >= 90% |
+| **CA** | Categorical Agreement — predicted S/I/R matches reference | >= 90% |
+| **VME** | Very Major Error — predicted S when true is R | <= 1.5% |
+| **ME** | Major Error — predicted R when true is S | <= 3% |
+| **mE** | Minor Error — any discordance involving I | <= 10% |
+
+Definitions per ISO 20776-2 / FDA criteria for AST systems.
+
+---
+
+## Try the demo
 
 ```bash
-# 1. Clone the repository
 git clone https://github.com/EstebanHerna/bacterioscope.git
 cd bacterioscope
-
-# 2. Install (requires Python 3.10 or newer)
 pip install -e ".[all,dev]"
-
-# 3. Launch the Streamlit demo
 streamlit run src/bacterioscope/app.py
 ```
 
-A browser tab opens automatically at `http://localhost:8501`.
-
-**Steps inside the demo:**
-
-1. Upload a raw Kirby-Bauer plate photograph (JPEG, PNG, or TIFF).
-2. The pipeline detects and measures all visible disks automatically.
-3. For each disk, select the antibiotic name from the dropdown.
-4. The S/I/R counters and the per-disk category badges update immediately.
-5. Click **Download report** to save a Markdown file with the results.
-
-> **Tip:** use `docs/plate_original.png` (included in this repository) as a
-> test image if you do not have a plate photograph available.
-
----
-
-## Full installation
-
-### Requirements
-
-- Python 3.10 or newer
-- pip (comes with Python)
-- Git
-
-### Install core + all extras
-
-```bash
-git clone https://github.com/EstebanHerna/bacterioscope.git
-cd bacterioscope
-pip install -e ".[all,dev]"
-```
-
-The `[all]` extra installs Ultralytics YOLOv8, FastAPI, and Streamlit.
-The `[dev]` extra adds testing and linting tools.
-
-If you only need the core pipeline without the web interface or API:
-
-```bash
-pip install -e ".[dev]"
-```
-
-### Verify the installation
-
-```bash
-pytest tests/ -v          # runs 107 tests — all should pass
-python -m bacterioscope version
-```
+Opens at `http://localhost:8501`. Upload a plate photograph (or use `docs/plate_original.png`) and assign antibiotic names per disk to see live S/I/R output.
 
 ---
 
 ## Usage
 
-### Interactive Streamlit demo
-
-```bash
-streamlit run src/bacterioscope/app.py
-# Opens http://localhost:8501
-```
-
 ### Command-line interface
 
 ```bash
-# Analyse a plate and print a colour-coded results table
 python -m bacterioscope analyze docs/plate_original.png
-
-# Save the annotated image to a file
 python -m bacterioscope analyze plate.jpg --output annotated.jpg
-
-# Override the organism group (only Enterobacteriaceae supported in Phase 0)
-python -m bacterioscope analyze plate.jpg --organism Enterobacteriaceae
-
-# Set a custom detection confidence threshold (YOLOv8 mode only)
-python -m bacterioscope analyze plate.jpg --confidence 0.4
+python -m bacterioscope version
 ```
 
 ### REST API
 
 ```bash
-# Start the API server
 uvicorn bacterioscope.api.routes:app --reload
-
-# Check the service is running
 curl http://localhost:8000/health
-
-# Analyse a plate image
-curl -X POST http://localhost:8000/analyze \
-     -F "image=@plate.jpg"
+curl -X POST http://localhost:8000/analyze -F "image=@plate.jpg"
 ```
 
-Interactive API documentation is available at `http://localhost:8000/docs`.
+Interactive API docs at `http://localhost:8000/docs`.
 
 ### Python API
 
 ```python
 from bacterioscope.pipeline import BacterioScopePipeline, PipelineConfig
 
-config = PipelineConfig(plate_diameter_mm=90.0, organism_group="Enterobacteriaceae")
-pipeline = BacterioScopePipeline(config)
+pipeline = BacterioScopePipeline(PipelineConfig(plate_diameter_mm=90.0))
 result = pipeline.analyze("plate.jpg")
-
-for item in result.classifications:
-    print(f"{item.antibiotic:30s}  {item.zone_diameter_mm:5.1f} mm  {item.category}")
+for cls in result.classifications:
+    print(cls.antibiotic, cls.zone_diameter_mm, cls.category)
 ```
 
 ---
@@ -190,158 +162,76 @@ for item in result.classifications:
 
 ```
 bacterioscope/
-├── src/
-│   └── bacterioscope/              ← importable Python package
-│       ├── __init__.py             ← package entry point (see docstring for overview)
-│       ├── __main__.py             ← enables `python -m bacterioscope`
-│       ├── pipeline.py             ← end-to-end orchestrator ← START HERE
-│       ├── cli.py                  ← command-line interface (Typer + Rich)
-│       ├── app.py                  ← Streamlit interactive demo
-│       ├── detection/
-│       │   ├── detector.py         ← DiskDetector: YOLOv8 or Hough fallback
-│       │   └── train.py            ← YOLOv8 training script (Phase 1)
-│       ├── segmentation/
-│       │   └── watershed.py        ← ZoneSegmenter: Otsu + contour fitting
-│       ├── classification/
-│       │   └── clsi.py             ← CLSIClassifier + CLSI 2023 breakpoint tables
-│       ├── api/
-│       │   ├── routes.py           ← FastAPI endpoints
-│       │   └── schemas.py          ← Pydantic request/response schemas
-│       ├── utils/
-│       │   ├── calibration.py      ← plate rim detection → px/mm ratio
-│       │   ├── visualization.py    ← annotated image generation
-│       │   └── image.py            ← image I/O helpers (Phase 1)
-│       └── evaluation/
-│           ├── metrics.py          ← CA, EA, VME, ME, mE calculation
-│           └── report.py           ← CSV + Markdown evaluation report
-├── tests/                          ← mirrors src/ structure
-│   ├── test_clsi.py
-│   ├── test_detector.py
-│   ├── test_api.py
-│   └── test_app.py
+├── src/bacterioscope/
+│   ├── pipeline.py          <- end-to-end orchestrator (start here)
+│   ├── cli.py               <- Typer CLI
+│   ├── app.py               <- Streamlit demo
+│   ├── _app_logic.py        <- pure helpers (no Streamlit dependency)
+│   ├── detection/
+│   │   ├── detector.py      <- DiskDetector: YOLOv8 or Hough fallback
+│   │   └── train.py         <- YOLOv8 training script (Phase 2)
+│   ├── segmentation/
+│   │   └── watershed.py     <- ZoneSegmenter: Otsu + contour fitting
+│   ├── classification/
+│   │   └── clsi.py          <- CLSIClassifier + CLSI 2023 breakpoints
+│   ├── evaluation/
+│   │   ├── metrics.py       <- CA, EA, VME, ME, mE
+│   │   └── report.py        <- Markdown + HTML report generation
+│   ├── api/
+│   │   ├── routes.py        <- FastAPI endpoints
+│   │   └── schemas.py       <- Pydantic schemas
+│   └── utils/
+│       ├── calibration.py   <- plate rim detection -> px/mm
+│       └── visualization.py <- annotated image output
+├── tests/                   <- 107 tests, mirrors src/ structure
 ├── scripts/
-│   ├── download_data.py            ← downloads Dryad/UZH dataset safely
-│   └── generate_demo.py            ← generates docs/pipeline_demo.gif
-├── notebooks/
-│   └── pipeline_walkthrough.ipynb  ← step-by-step guided tour
+│   ├── download_data.py     <- Dryad/UZH dataset downloader (zip-slip safe)
+│   └── generate_demo.py     <- generates synthetic demo images in docs/
 ├── docs/
-│   ├── plate_original.png          ← synthetic test plate (use for demo)
-│   └── pipeline_demo.gif           ← animated pipeline demonstration
-├── data/                           ← gitignored: raw images, processed labels, weights
-├── pyproject.toml                  ← all configuration: deps, ruff, mypy, pytest, bandit
-├── Dockerfile                      ← non-root container for production deployment
-├── Makefile                        ← shortcuts: make test, make lint, make demo
-└── CLAUDE.md                       ← AI agent context file
+│   ├── ROADMAP.md           <- phased development plan
+│   ├── plate_original.png   <- synthetic test plate
+│   └── pipeline_demo.gif    <- animated pipeline walkthrough
+├── pyproject.toml           <- all config: deps, ruff, mypy, pytest, bandit
+├── Dockerfile               <- non-root production container
+└── Makefile                 <- make test / make lint / make demo
 ```
 
-**Where to start reading the code:**
-
-1. `pipeline.py` — the orchestrator that calls everything else.
-2. `classification/clsi.py` — the breakpoint tables and S/I/R logic.
-3. `detection/detector.py` — Hough fallback and YOLOv8 wrapper.
-4. `segmentation/watershed.py` — zone measurement algorithm.
-
 ---
 
-## Clinical evaluation metrics
+## Dataset
 
-The `bacterioscope.evaluation` module computes ISO 20776-2 / FDA clinical agreement metrics. Run against a labelled ground-truth CSV:
-
-```bash
-python scripts/evaluate.py \
-  --image-dir data/processed/images \
-  --csv       data/processed/labels.csv \
-  --output    results/
-```
-
-| Metric | Description | Acceptance threshold |
-|--------|-------------|----------------------|
-| **CA** | Categorical Agreement — predicted category matches reference | ≥ 90 % |
-| **EA** | Essential Agreement — measured diameter within ±2 mm of reference | ≥ 90 % |
-| **VME** | Very Major Error — predicted S when true category is R (dangerous miss) | ≤ 1.5 % |
-| **ME** | Major Error — predicted R when true category is S | ≤ 3 % |
-| **mE** | Minor Error — any discordance involving the Intermediate category | ≤ 10 % |
-| **MAE** | Mean Absolute Error of zone diameters | — |
-| **r** | Pearson correlation between measured and reference diameters | — |
-
-EA definition adapted from ISO 20776-2: diameter within ±2 mm (EUCAST EDef 13.2) rather than the classical MIC ±1 two-fold dilution definition.
-
----
-
-## Datasets
-
-| Dataset | Description | How to download |
-|---------|-------------|-----------------|
-| **Dryad/UZH** (Giske et al., 2024) | 225 Gram-negative isolates, 862 phenotypic categories including ESBL, AmpC, and carbapenemase producers | `python scripts/download_data.py` |
-| **Roboflow/KB-AST** | Community-annotated Kirby-Bauer images with bounding boxes for YOLOv8 training | Manual download from Roboflow |
-| **AntibiogramJ reference set** | Benchmark images from Heras et al. (2017) | Included in the AntibiogramJ repository |
-
----
-
-## Project phases
-
-| Phase | Scope | Status |
-|-------|-------|--------|
-| **0 — Detection & Measurement** | Hough disk detection, Otsu zone segmentation, CLSI classification, Streamlit demo, REST API, CLI, evaluation module, 107 tests, CI | **Complete** |
-| **1 — YOLOv8 Training** | Train on Dryad/UZH dataset, automated antibiotic label reading, validate zone measurements against ground truth | Planned |
-| **2 — Clinical Validation** | Validation study with clinical isolates, pilot deployment in low-resource lab | Planned |
+| Dataset | Description | Access |
+|---|---|---|
+| **Dryad/UZH** (Giske et al., 2024) | 225 Gram-negative isolates, 862 phenotypic categories with clinical ground truth — primary training and validation set for Phases 1–3 | `python scripts/download_data.py` |
+| **Roboflow/KB-AST** | Community-annotated Kirby-Bauer images with disk bounding boxes | Manual download from Roboflow |
 
 ---
 
 ## Development
 
 ```bash
-pip install -e ".[dev]"           # core + dev tools (no ML/API/UI)
-pip install -e ".[all,dev]"       # everything
+pip install -e ".[dev]"           # core + dev tools
+pip install -e ".[all,dev]"       # everything (ML, API, UI)
 
 make test                          # pytest tests/ -v
 make lint                          # ruff check src/ tests/
-ruff check --fix src/ tests/       # auto-fix import order and style issues
-mypy src/bacterioscope/            # static type checking
+ruff check --fix src/ tests/       # auto-fix style
+mypy src/bacterioscope/            # type checking (strict)
 bandit -r src/ -c pyproject.toml   # security scan
 ```
 
-### Code standards
-
-- Python 3.10+ type hints on all function signatures.
-- Google-style docstrings on all public and private functions.
-- Functions under 40 lines of executable logic.
-- `ruff`, `mypy`, `bandit`, and `pytest` must all pass before committing.
-
-For a guided tour of the pipeline, open `notebooks/pipeline_walkthrough.ipynb`.
-
 ---
 
-## Research context
+## Team
 
-This repository is the engineering backbone of an ongoing research collaboration between the Departments of Systems Engineering and Microbiology at Universidad de los Andes (Bogotá, Colombia), supervised by Prof. Astrid Blanco.
-
-Domain expertise and CLSI protocol guidance provided by Paula Becerra Lara (Microbiology, Uniandes).
-
-**Related publications (preprint):**
-
-- Hernandez-Sulvara, E. A. & Becerra-Lara, P. A. (2026). *Early Prediction of Carbapenem Resistance in Klebsiella pneumoniae via Computer Vision Applied to Kirby-Bauer Antibiograms.* Universidad de los Andes.
-- Hernandez-Sulvara, E. A. & Becerra-Lara, P. A. (2026). *Early Visual Detection of Bacterial Growth in Blood Cultures via Computer Vision.* Universidad de los Andes.
-
-**Related projects by the same developer:**
-
-- **NexusMind** — AWS AI League top 100/1000. Nine Lambda functions, Bedrock + Claude 3 Haiku, DynamoDB, EventBridge, React.
-- **CaminAI** — 3rd place, Young AI Leaders Bogotá.
-- **Altus** — B2B alternative credit scoring API. Cornell EMC2 Mark Mobius Pitch 2026.
-
----
-
-## Tech stack
-
-| Layer | Technology |
-|-------|-----------|
-| Disk detection | Ultralytics YOLOv8 (PyTorch), OpenCV HoughCircles fallback |
-| Zone segmentation | OpenCV 4.x, scikit-image (Otsu thresholding + contour fitting) |
-| Classification | CLSI M100-Ed33 (2023) breakpoint tables |
-| Evaluation | ISO 20776-2 / FDA clinical agreement metrics |
-| REST API | FastAPI + python-multipart |
-| Interactive demo | Streamlit |
-| Infrastructure | Docker, GitHub Actions CI, pytest, ruff, mypy, bandit, gitleaks |
+| Role | Member |
+|---|---|
+| Technical lead / ML | Esteban A. Hernandez Sulvara — Systems Engineering, Uniandes |
+| Microbiology | Paula Becerra Lara — Microbiology, Uniandes |
+| Microbiology | Farid — Uniandes |
+| Interface & data | Santiago Gomez — Uniandes |
+| Advisor | Prof. Aurelio — Uniandes |
+| Advisor | Astrid Berena Herrera — Uniandes |
 
 ---
 
@@ -349,7 +239,6 @@ Domain expertise and CLSI protocol guidance provided by Paula Becerra Lara (Micr
 
 MIT — see [LICENSE](LICENSE).
 
-## Authors
+---
 
-- **Esteban A. Hernandez Sulvara** — Systems Engineering, Universidad de los Andes ([GitHub](https://github.com/EstebanHerna))
-- **Paula A. Becerra Lara** — Microbiology, Universidad de los Andes
+*"La tecnología al servicio de la salud pública."*
