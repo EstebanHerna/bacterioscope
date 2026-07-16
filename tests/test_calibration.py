@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import pytest
 
-from bacterioscope.utils.calibration import calibrate_px_per_mm
+from bacterioscope.utils.calibration import calibrate_from_disk_radius_px, calibrate_px_per_mm
 
 
 def _blank_image(size: int = 400) -> np.ndarray:
@@ -15,6 +15,31 @@ def _ring_image(size: int = 600, radius: int = 180, thickness: int = 4) -> np.nd
     image = np.zeros((size, size, 3), dtype=np.uint8)
     cv2.circle(image, (size // 2, size // 2), radius, (200, 200, 200), thickness)
     return image
+
+
+class TestCalibrateFromDiskRadius:
+    def test_known_ratio(self) -> None:
+        assert calibrate_from_disk_radius_px(30.0) == pytest.approx(10.0)
+
+    def test_custom_disk_diameter(self) -> None:
+        assert calibrate_from_disk_radius_px(24.0, disk_diameter_mm=8.0) == pytest.approx(6.0)
+
+    def test_zero_radius_raises(self) -> None:
+        with pytest.raises(ValueError, match="disk_radius_px must be positive"):
+            calibrate_from_disk_radius_px(0.0)
+
+    def test_negative_radius_raises(self) -> None:
+        with pytest.raises(ValueError):
+            calibrate_from_disk_radius_px(-5.0)
+
+    def test_zero_diameter_raises(self) -> None:
+        with pytest.raises(ValueError, match="disk_diameter_mm must be positive"):
+            calibrate_from_disk_radius_px(30.0, disk_diameter_mm=0.0)
+
+    def test_scales_linearly_with_radius(self) -> None:
+        low = calibrate_from_disk_radius_px(15.0)
+        high = calibrate_from_disk_radius_px(60.0)
+        assert high == pytest.approx(low * 4, rel=1e-6)
 
 
 class TestCalibratePxPerMm:

@@ -55,7 +55,7 @@ from numpy.typing import NDArray
 from bacterioscope.classification.clsi import CLSIClassifier, SusceptibilityResult
 from bacterioscope.detection.detector import DiskDetector, DiskResult
 from bacterioscope.segmentation.watershed import ZoneResult, ZoneSegmenter
-from bacterioscope.utils.calibration import calibrate_px_per_mm
+from bacterioscope.utils.calibration import calibrate_from_disk_radius_px, calibrate_px_per_mm
 from bacterioscope.utils.visualization import draw_results
 
 
@@ -81,12 +81,22 @@ class PipelineConfig:
             ``'Enterobacteriaceae'`` is supported.
         clsi_version: Edition of CLSI M100 to apply.  Currently ``'2023'``
             (M100-Ed33).
+        use_disk_calibration: If ``True`` and at least one disk is detected,
+            derive px/mm from the median disk radius using the known 6 mm
+            physical disk diameter (CLSI M02) instead of plate-rim Hough
+            detection.  More robust under variable lighting.  Defaults to
+            ``False`` for backwards compatibility.
+        disk_diameter_mm: Physical diameter of a standard antibiotic disk in
+            mm.  Used only when ``use_disk_calibration`` is ``True``.
+            Change only for non-standard consumables.
     """
     detector_weights: Path = Path("data/models/yolov8_disks.pt")
     confidence_threshold: float = 0.5
     plate_diameter_mm: float = 90.0
     organism_group: str = "Enterobacteriaceae"
     clsi_version: str = "2023"
+    use_disk_calibration: bool = False
+    disk_diameter_mm: float = 6.0
 
 
 @dataclass
@@ -227,6 +237,12 @@ class BacterioScopePipeline:
         )
 
         disks = self.detector.detect(image)
+
+        if self.config.use_disk_calibration and disks:
+            median_radius = float(np.median([d.radius_px for d in disks]))
+            px_per_mm = calibrate_from_disk_radius_px(
+                median_radius, self.config.disk_diameter_mm
+            )
 
         zones = []
         for disk in disks:

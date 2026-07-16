@@ -35,6 +35,39 @@ import numpy as np
 from numpy.typing import NDArray
 
 
+def calibrate_from_disk_radius_px(
+    disk_radius_px: float,
+    disk_diameter_mm: float = 6.0,
+) -> float:
+    """Compute px/mm using the known physical diameter of an antibiotic disk.
+
+    Every standard antibiotic disk has a physical diameter of exactly 6 mm
+    (CLSI M02 / OPS quality-control convention). Using the disk itself as the
+    calibration reference is more robust than plate-rim detection because the
+    disk boundary is always sharp and high-contrast regardless of lighting or
+    camera distance. This is the Phase 3 calibration method.
+
+    When multiple disks are detected, pass the median detected radius to reduce
+    the effect of any single outlier.
+
+    Args:
+        disk_radius_px: Detected radius of an antibiotic disk in pixels.
+        disk_diameter_mm: Physical disk diameter in mm. Standard CLSI disks
+            are 6.0 mm; change only for non-standard consumables.
+
+    Returns:
+        Calibration factor in pixels per millimetre.
+
+    Raises:
+        ValueError: If either argument is not strictly positive.
+    """
+    if disk_radius_px <= 0:
+        raise ValueError(f"disk_radius_px must be positive, got {disk_radius_px}")
+    if disk_diameter_mm <= 0:
+        raise ValueError(f"disk_diameter_mm must be positive, got {disk_diameter_mm}")
+    return (disk_radius_px * 2.0) / disk_diameter_mm
+
+
 def calibrate_px_per_mm(
     image: NDArray[np.uint8],
     plate_diameter_mm: float = 90.0,
