@@ -228,9 +228,7 @@ bandit -r src/ -c pyproject.toml   # security scan
 |---|---|
 | Technical lead / ML | Esteban A. Hernandez Sulvara — Systems Engineering, Uniandes |
 | Microbiology | Paula Becerra Lara — Microbiology, Uniandes |
-| Microbiology | Farid — Uniandes |
 | Interface & data | Santiago Gomez — Uniandes |
-| Advisor | Prof. Aurelio — Uniandes |
 | Advisor | Astrid Berena Herrera — Uniandes |
 
 ---
