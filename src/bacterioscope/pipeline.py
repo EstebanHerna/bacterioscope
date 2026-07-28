@@ -44,6 +44,7 @@ this pipeline directly.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -57,6 +58,8 @@ from bacterioscope.detection.detector import DiskDetector, DiskResult
 from bacterioscope.segmentation.watershed import ZoneResult, ZoneSegmenter
 from bacterioscope.utils.calibration import calibrate_from_disk_radius_px, calibrate_px_per_mm
 from bacterioscope.utils.visualization import draw_results
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -268,3 +271,25 @@ class BacterioScopePipeline:
             classifications=classifications,
             annotated_image=annotated,
         )
+
+    def analyze_safe(
+        self,
+        image_path: str | Path,
+    ) -> AnalysisResult | None:
+        """Run the pipeline without raising — returns None on any failure.
+
+        Intended for batch processing where a single bad image must not abort
+        the whole run.  All exceptions are logged at WARNING level with the
+        image path and reason so failures can be investigated after the batch.
+
+        Args:
+            image_path: Path to the plate image.
+
+        Returns:
+            ``AnalysisResult`` on success, ``None`` on any error.
+        """
+        try:
+            return self.analyze(image_path)
+        except Exception as exc:
+            log.warning("Skipping %s — %s: %s", image_path, type(exc).__name__, exc)
+            return None

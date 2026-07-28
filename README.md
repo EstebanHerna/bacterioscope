@@ -76,7 +76,7 @@ The end-to-end pipeline is fully operational on the Hough + Otsu baseline.
 | Command-line interface (Typer + Rich) | Complete |
 | REST API (FastAPI, `/health` + `/analyze`) | Complete |
 | Clinical evaluation module (CA, EA, VME, ME, mE — ISO 20776-2) | Complete |
-| Test suite | 107 tests, all passing |
+| Test suite | 125 tests, all passing |
 | CI (GitHub Actions) | Green on Python 3.10, 3.11, 3.12 |
 | Static analysis | ruff, mypy strict, bandit, gitleaks |
 
@@ -98,7 +98,26 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for full detail.
 
 ---
 
-## Objective metrics (target at F3 completion)
+## Validation against real clinical isolates
+
+BacterioScope is validated against the **Dryad/UZH SIRscan dataset** (Egli et al., 2023):
+225 Gram-negative clinical isolates photographed with a standardised setup and measured
+by the SIRscan automated reader under EUCAST 2023 breakpoints.
+
+### Measurement accuracy (Phase 0 baseline — pending dataset download)
+
+| Metric | Value | Target |
+|---|---|---|
+| Essential Agreement (EA, ±2 mm) | _pending_ | ≥ 90% |
+| Mean Absolute Error (MAE, mm) | _pending_ | — |
+| Pearson r | _pending_ | — |
+
+> **Note on standards**: the UZH reference uses EUCAST 2023 breakpoints; BacterioScope
+> classifies using CLSI M100-Ed33 2023. Only measurement accuracy (mm) is compared in
+> this phase. Full S/I/R validation against a CLSI-annotated reference is planned for Phase 3.
+> See [docs/VALIDATION_REPORT.md](docs/VALIDATION_REPORT.md) for full methodology.
+
+### Objective classification targets (Phase 3)
 
 | Metric | Description | Target |
 |---|---|---|
@@ -183,14 +202,19 @@ bacterioscope/
 │   └── utils/
 │       ├── calibration.py   <- plate rim detection -> px/mm
 │       └── visualization.py <- annotated image output
-├── tests/                   <- 107 tests, mirrors src/ structure
+├── tests/                   <- 125 tests, mirrors src/ structure
 ├── scripts/
-│   ├── download_data.py     <- Dryad/UZH dataset downloader (zip-slip safe)
-│   └── generate_demo.py     <- generates synthetic demo images in docs/
+│   ├── download_data.py        <- Dryad/UZH downloader with manual-step instructions
+│   ├── prepare_dataset.py      <- normalise UZH CSV for validation pipeline
+│   ├── validate_measurement.py <- EA / MAE / Pearson r vs SIRscan reference
+│   ├── evaluate.py             <- batch S/I/R evaluation against labelled CSV
+│   └── generate_demo.py        <- synthetic demo images in docs/
 ├── docs/
-│   ├── ROADMAP.md           <- phased development plan
-│   ├── plate_original.png   <- synthetic test plate
-│   └── pipeline_demo.gif    <- animated pipeline walkthrough
+│   ├── ROADMAP.md              <- phased development plan
+│   ├── VALIDATION_REPORT.md    <- measurement validation vs UZH SIRscan
+│   ├── figures/                <- annotated plates (populate with validate_measurement.py)
+│   ├── plate_original.png      <- synthetic test plate
+│   └── pipeline_demo.gif       <- animated pipeline walkthrough
 ├── pyproject.toml           <- all config: deps, ruff, mypy, pytest, bandit
 ├── Dockerfile               <- non-root production container
 └── Makefile                 <- make test / make lint / make demo
@@ -202,8 +226,27 @@ bacterioscope/
 
 | Dataset | Description | Access |
 |---|---|---|
-| **Dryad/UZH** (Giske et al., 2024) | 225 Gram-negative isolates, 862 phenotypic categories with clinical ground truth — primary training and validation set for Phases 1–3 | `python scripts/download_data.py` |
+| **Dryad/UZH** (Egli et al., 2023) | 225 Gram-negative isolates, 862 phenotypic categories with SIRscan reference measurements (EUCAST). Primary validation set. | `python scripts/download_data.py` (manual browser step — see script docstring) |
 | **Roboflow/KB-AST** | Community-annotated Kirby-Bauer images with disk bounding boxes | Manual download from Roboflow |
+
+### Dataset citation
+
+> Egli A, Imkamp F, Amlang G, Brunner S, Albrich W, et al. (2023).
+> *Automated reading of disk diffusion antibiograms.*
+> Dryad Digital Repository.
+> [https://doi.org/10.5061/dryad.5dv41nsfj](https://doi.org/10.5061/dryad.5dv41nsfj)
+> License: CC0 1.0 Universal.
+
+### Validation workflow
+
+```bash
+python scripts/download_data.py      # follow the manual download prompt
+python scripts/prepare_dataset.py    # normalise reference measurements to CSV
+python scripts/validate_measurement.py  # compute EA / MAE / Pearson r
+```
+
+Results are written to [docs/VALIDATION_REPORT.md](docs/VALIDATION_REPORT.md).
+Annotated plate images are saved in `docs/figures/`.
 
 ---
 

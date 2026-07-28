@@ -91,7 +91,7 @@ def resize_for_inference(
     new_h = int(h * scale)
     new_w = int(w * scale)
     resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
-    canvas = np.full((target_size, target_size, 3), 114, dtype=np.uint8)
+    canvas: NDArray[np.uint8] = np.full((target_size, target_size, 3), 114, dtype=np.uint8)
     pad_y = (target_size - new_h) // 2
     pad_x = (target_size - new_w) // 2
     canvas[pad_y : pad_y + new_h, pad_x : pad_x + new_w] = resized

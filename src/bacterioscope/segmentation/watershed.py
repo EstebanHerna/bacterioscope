@@ -99,9 +99,16 @@ class ZoneSegmenter:
             ``4.0`` means the ROI extends 4 × disk_radius pixels in each
             direction, covering zones up to 8 × disk_radius in diameter.
             Increase for plates with very large inhibition zones.
+        use_clahe: When ``True``, apply Contrast Limited Adaptive Histogram
+            Equalization (CLAHE) to the grayscale ROI before Otsu thresholding.
+            Improves performance on real plate photographs with uneven bench
+            lighting, flash reflections, or non-uniform agar pigmentation.
+            Adds ~2 ms per disk; leave ``False`` for synthetic images.
     """
-    def __init__(self, margin_factor: float = 4.0) -> None:
+    def __init__(self, margin_factor: float = 4.0, use_clahe: bool = False) -> None:
         self.margin_factor = margin_factor
+        self.use_clahe = use_clahe
+        self._clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
     def segment(
         self,
@@ -129,6 +136,8 @@ class ZoneSegmenter:
         roi, offset_x, offset_y = self._extract_roi(image, disk, search_radius)
 
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        if self.use_clahe:
+            gray = self._clahe.apply(gray)
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
         _, binary = cv2.threshold(

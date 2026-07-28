@@ -1,4 +1,31 @@
-"""Download public antibiogram image datasets for BacterioScope training and evaluation."""
+"""Download public antibiogram image datasets for BacterioScope training and evaluation.
+
+Dryad/UZH dataset — manual download instructions
+-------------------------------------------------
+The UZH SIRscan dataset (Egli et al., 2023) is published under the CC0 1.0 Universal
+public-domain dedication and is freely available on Dryad. Dryad requires accepting the
+terms of service through their web interface before any download can begin, which prevents
+fully automated retrieval. Follow these steps once:
+
+1. Open https://datadryad.org/dataset/doi:10.5061/dryad.5dv41nsfj in a browser.
+2. Click the "Download dataset" button (top-right area of the page).
+3. If prompted, create a free Dryad account and accept the terms of service.
+4. Save the downloaded ZIP archive to data/raw/dryad_uzh.zip.
+5. Run: python scripts/download_data.py
+   The script will extract and verify the archive structure.
+6. Run: python scripts/prepare_dataset.py
+   This normalises the measurements CSV and image paths for the validation pipeline.
+
+Expected extracted structure (may vary by Dryad version):
+    data/raw/dryad_uzh/
+        *.jpg or *.png          — plate photographs, one per isolate
+        measurements.csv        — SIRscan zone diameters and EUCAST categories
+        README.txt              — dataset description from the authors
+
+Citation:
+    Egli A, et al. (2023). Automated reading of disk diffusion antibiograms.
+    Dataset on Dryad. https://doi.org/10.5061/dryad.5dv41nsfj
+"""
 from __future__ import annotations
 
 import zipfile
@@ -16,11 +43,13 @@ DATASETS = {
     "dryad_uzh": {
         "url": "https://datadryad.org/dataset/doi:10.5061/dryad.5dv41nsfj",
         "description": (
-            "University of Zurich SIRscan dataset. "
+            "University of Zurich SIRscan dataset (Egli et al., 2023). "
             "225 Gram-negative isolates, 862 phenotypic categories. "
-            "Manual download required from Dryad (license terms)."
+            "CC0 1.0 license. Manual browser download required (see module docstring)."
         ),
         "auto_download": False,
+        "zip_name": "dryad_uzh.zip",
+        "extract_dir": "dryad_uzh",
     },
 }
 
@@ -85,16 +114,28 @@ def main() -> None:
         print(f"  {info['description']}")
 
         if not info["auto_download"]:
-            print(f"  Manual download required: {info['url']}")
-            dest = DATA_DIR / name
-            dest.mkdir(exist_ok=True)
-            readme = dest / "DOWNLOAD_INSTRUCTIONS.txt"
-            readme.write_text(
-                f"Download the dataset manually from:\n{info['url']}\n\n"
-                f"Place the downloaded files in this directory ({dest}).\n"
+            dest = DATA_DIR / info["extract_dir"]
+            dest.mkdir(parents=True, exist_ok=True)
+            instructions = dest / "DOWNLOAD_INSTRUCTIONS.txt"
+            instructions.write_text(
+                "DRYAD/UZH DATASET — DOWNLOAD INSTRUCTIONS\n"
+                "==========================================\n\n"
+                f"Dataset URL: {info['url']}\n\n"
+                "Steps:\n"
+                "  1. Open the URL above in a browser.\n"
+                "  2. Click 'Download dataset' and accept Dryad terms of service.\n"
+                f"  3. Save the ZIP file as:  data/raw/{info['zip_name']}\n"
+                "  4. Run: python scripts/download_data.py\n"
+                "     (this script will extract and validate the archive)\n"
+                "  5. Run: python scripts/prepare_dataset.py\n\n"
                 f"Description: {info['description']}\n"
             )
-            print(f"  Instructions saved to {readme}")
+            zip_path = DATA_DIR / info["zip_name"]
+            if zip_path.exists():
+                print(f"  ZIP found at {zip_path} — extracting...")
+                extract_zip(zip_path, dest)
+            else:
+                print(f"  ZIP not found. Instructions saved to {instructions}")
             continue
 
         dest_file = DATA_DIR / f"{name}.zip"

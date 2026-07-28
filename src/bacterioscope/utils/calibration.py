@@ -99,16 +99,20 @@ def calibrate_px_per_mm(
     min_radius = min(h, w) // 4
     max_radius = min(h, w) // 2
 
-    circles = cv2.HoughCircles(
-        blurred,
-        cv2.HOUGH_GRADIENT,
-        dp=1.5,
-        minDist=min(h, w),
-        param1=80,
-        param2=40,
-        minRadius=min_radius,
-        maxRadius=max_radius,
-    )
+    circles = None
+    for param2 in (40, 30, 20):
+        circles = cv2.HoughCircles(
+            blurred,
+            cv2.HOUGH_GRADIENT,
+            dp=1.5,
+            minDist=min(h, w),
+            param1=80,
+            param2=param2,
+            minRadius=min_radius,
+            maxRadius=max_radius,
+        )
+        if circles is not None:
+            break
 
     if circles is not None:
         circles = np.around(circles).astype(np.uint16)
