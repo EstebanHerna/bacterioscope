@@ -41,6 +41,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import cv2
 import numpy as np
 from numpy.typing import NDArray
 
@@ -49,6 +50,14 @@ from numpy.typing import NDArray
 # enable enforcement. torch.load (called internally by ultralytics) can execute arbitrary
 # code when weights_only=False — only load weights from sources you control.
 _TRUSTED_MODEL_HASHES: dict[str, str] = {}
+
+_DISK_BLUR_KERNEL: tuple[int, int] = (9, 9)
+_HOUGH_DP: float = 1.2
+_HOUGH_MIN_DIST: int = 50
+_HOUGH_PARAM1: int = 50
+_HOUGH_PARAM2: int = 20
+_HOUGH_MIN_RADIUS: int = 10
+_HOUGH_MAX_RADIUS: int = 40
 
 
 @dataclass
@@ -179,30 +188,29 @@ class DiskDetector:
         """Detect disk-shaped circles using the Hough Circle Transform.
 
         Converts the image to grayscale, applies Gaussian blur to reduce
-        sensor noise, and calls ``cv2.HoughCircles`` with parameters tuned for
-        standard 6-mm antibiotic disks on a 90-mm plate.
+        sensor noise, and runs HoughCircles with parameters tuned for standard
+        6-mm antibiotic disks on a 90-mm plate.  param1 and param2 were
+        calibrated on the synthetic test plate; adjust for very different
+        contrast characteristics.  Disk labels default to 'disk_0', 'disk_1',
+        etc. because the Hough transform cannot read printed labels.
 
-        The ``param1=50`` Canny upper threshold and ``param2=20`` accumulator
-        threshold were calibrated to detect all 6 disks on the synthetic test
-        plate without producing false positives.  Adjust if your plate images
-        have very different contrast characteristics.
+        Args:
+            image: BGR plate image.
 
-        Disk labels are assigned as ``'disk_0'``, ``'disk_1'``, etc. in the
-        order returned by the Hough transform.  Confidence is always 0.0.
+        Returns:
+            List of DiskResult objects, one per detected circle.
         """
-        import cv2
-
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray, (9, 9), 2)
+        blurred = cv2.GaussianBlur(gray, _DISK_BLUR_KERNEL, 2)
         circles = cv2.HoughCircles(
             blurred,
             cv2.HOUGH_GRADIENT,
-            dp=1.2,
-            minDist=50,
-            param1=50,
-            param2=20,
-            minRadius=10,
-            maxRadius=40,
+            dp=_HOUGH_DP,
+            minDist=_HOUGH_MIN_DIST,
+            param1=_HOUGH_PARAM1,
+            param2=_HOUGH_PARAM2,
+            minRadius=_HOUGH_MIN_RADIUS,
+            maxRadius=_HOUGH_MAX_RADIUS,
         )
         disks: list[DiskResult] = []
         if circles is not None:

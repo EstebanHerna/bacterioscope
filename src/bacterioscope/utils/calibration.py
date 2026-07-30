@@ -34,6 +34,8 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+_PLATE_FALLBACK_FRACTION: float = 0.9
+
 
 def calibrate_from_disk_radius_px(
     disk_radius_px: float,
@@ -119,7 +121,7 @@ def calibrate_px_per_mm(
         largest = max(circles[0], key=lambda c: c[2])
         plate_diameter_px = float(largest[2]) * 2
     else:
-        plate_diameter_px = float(min(h, w)) * 0.9
+        plate_diameter_px = float(min(h, w)) * _PLATE_FALLBACK_FRACTION
 
     px_per_mm = plate_diameter_px / plate_diameter_mm
     return plate_diameter_px, px_per_mm

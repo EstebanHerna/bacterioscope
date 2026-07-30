@@ -50,6 +50,13 @@ from numpy.typing import NDArray
 
 from bacterioscope.detection.detector import DiskResult
 
+_GAUSS_KERNEL: tuple[int, int] = (5, 5)
+_MORPH_KERNEL: tuple[int, int] = (5, 5)
+_CLOSE_ITERS: int = 2
+_OPEN_ITERS: int = 1
+_CLAHE_CLIP_LIMIT: float = 2.0
+_CLAHE_TILE_SIZE: tuple[int, int] = (8, 8)
+
 
 @dataclass
 class ZoneResult:
@@ -108,7 +115,7 @@ class ZoneSegmenter:
     def __init__(self, margin_factor: float = 4.0, use_clahe: bool = False) -> None:
         self.margin_factor = margin_factor
         self.use_clahe = use_clahe
-        self._clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        self._clahe = cv2.createCLAHE(clipLimit=_CLAHE_CLIP_LIMIT, tileGridSize=_CLAHE_TILE_SIZE)
 
     def segment(
         self,
@@ -135,42 +142,82 @@ class ZoneSegmenter:
         search_radius = int(disk.radius_px * self.margin_factor)
         roi, offset_x, offset_y = self._extract_roi(image, disk, search_radius)
 
-        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-        if self.use_clahe:
-            gray = self._clahe.apply(gray)
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-
-        _, binary = cv2.threshold(
-            blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
-        )
-
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-        binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel, iterations=2)
-        binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel, iterations=1)
+        blurred = self._preprocess_roi(roi)
+        _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        binary = self._apply_morphology(binary)
 
         contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
         if not contours:
             return self._no_zone(disk, px_per_mm)
 
         disk_local_x = disk.center_x - offset_x
         disk_local_y = disk.center_y - offset_y
-
         best_contour = self._find_zone_contour(contours, disk_local_x, disk_local_y)
         if best_contour is None:
             return self._no_zone(disk, px_per_mm)
 
-        area = cv2.contourArea(best_contour)
-        perimeter = cv2.arcLength(best_contour, True)
+        return self._build_zone_result(image, disk, best_contour, offset_x, offset_y, px_per_mm)
+
+    def _preprocess_roi(self, roi: NDArray[np.uint8]) -> NDArray[np.uint8]:
+        """Convert ROI to grayscale, optionally apply CLAHE, then Gaussian blur.
+
+        Args:
+            roi: BGR crop around one disk.
+
+        Returns:
+            Blurred grayscale image ready for Otsu thresholding.
+        """
+        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        if self.use_clahe:
+            gray = self._clahe.apply(gray)
+        return cv2.GaussianBlur(gray, _GAUSS_KERNEL, 0)
+
+    def _apply_morphology(self, binary: NDArray[np.uint8]) -> NDArray[np.uint8]:
+        """Close small holes then remove isolated speckles from a binary mask.
+
+        Args:
+            binary: Thresholded binary image.
+
+        Returns:
+            Cleaned binary image after morphological close and open.
+        """
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, _MORPH_KERNEL)
+        binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel, iterations=_CLOSE_ITERS)
+        return cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel, iterations=_OPEN_ITERS)
+
+    def _build_zone_result(
+        self,
+        image: NDArray[np.uint8],
+        disk: DiskResult,
+        contour: NDArray[np.uint8],
+        offset_x: int,
+        offset_y: int,
+        px_per_mm: float,
+    ) -> ZoneResult:
+        """Measure a contour and construct the ZoneResult for the matched disk.
+
+        Args:
+            image: Full plate image (used only for its shape to build the mask).
+            disk: Disk whose zone this contour represents.
+            contour: Best zone contour in ROI-local coordinates.
+            offset_x: X offset of the ROI top-left corner in the full image.
+            offset_y: Y offset of the ROI top-left corner in the full image.
+            px_per_mm: Calibration factor for pixel-to-mm conversion.
+
+        Returns:
+            ZoneResult with diameter, circularity, and zone mask.
+        """
+        area = cv2.contourArea(contour)
+        perimeter = cv2.arcLength(contour, True)
         circularity = (4 * np.pi * area) / (perimeter ** 2) if perimeter > 0 else 0.0
 
-        (cx, cy), radius = cv2.minEnclosingCircle(best_contour)
+        (cx, cy), radius = cv2.minEnclosingCircle(contour)
         diameter_px = radius * 2
         diameter_mm = diameter_px / px_per_mm
 
         mask = np.zeros(image.shape[:2], dtype=np.uint8)
-        shifted_contour = best_contour + np.array([offset_x, offset_y])
-        cv2.drawContours(mask, [shifted_contour], -1, 255, -1)
+        shifted = contour + np.array([offset_x, offset_y])
+        cv2.drawContours(mask, [shifted], -1, 255, -1)
 
         return ZoneResult(
             disk_label=disk.label,

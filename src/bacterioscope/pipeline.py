@@ -49,7 +49,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import cv2
 import numpy as np
 from numpy.typing import NDArray
 
@@ -57,6 +56,7 @@ from bacterioscope.classification.clsi import CLSIClassifier, SusceptibilityResu
 from bacterioscope.detection.detector import DiskDetector, DiskResult
 from bacterioscope.segmentation.watershed import ZoneResult, ZoneSegmenter
 from bacterioscope.utils.calibration import calibrate_from_disk_radius_px, calibrate_px_per_mm
+from bacterioscope.utils.image import load_image
 from bacterioscope.utils.visualization import draw_results
 
 log = logging.getLogger(__name__)
@@ -159,12 +159,6 @@ class AnalysisResult:
         }
 
 
-_ALLOWED_SUFFIXES: frozenset[str] = frozenset(
-    {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"}
-)
-_MAX_IMAGE_BYTES: int = 50 * 1024 * 1024  # 50 MB
-
-
 class BacterioScopePipeline:
     """End-to-end antibiogram analysis pipeline.
 
@@ -225,41 +219,17 @@ class BacterioScopePipeline:
                 or cannot be decoded by OpenCV.
         """
         image_path = Path(image_path)
-        if not image_path.is_file():
-            raise FileNotFoundError(f"Image not found: {image_path}")
-        if image_path.suffix.lower() not in _ALLOWED_SUFFIXES:
-            raise ValueError(f"Unsupported image format: {image_path.suffix!r}")
-        if image_path.stat().st_size > _MAX_IMAGE_BYTES:
-            raise ValueError(f"Image exceeds 50 MB size limit: {image_path}")
-        image = cv2.imread(str(image_path))
-        if image is None:
-            raise ValueError(f"Could not decode image: {image_path}")
+        image = load_image(image_path)
 
-        plate_diameter_px, px_per_mm = calibrate_px_per_mm(
-            image, self.config.plate_diameter_mm
-        )
-
+        plate_diameter_px, px_per_mm = calibrate_px_per_mm(image, self.config.plate_diameter_mm)
         disks = self.detector.detect(image)
 
         if self.config.use_disk_calibration and disks:
             median_radius = float(np.median([d.radius_px for d in disks]))
-            px_per_mm = calibrate_from_disk_radius_px(
-                median_radius, self.config.disk_diameter_mm
-            )
+            px_per_mm = calibrate_from_disk_radius_px(median_radius, self.config.disk_diameter_mm)
 
-        zones = []
-        for disk in disks:
-            zone = self.segmenter.segment(image, disk, px_per_mm)
-            zones.append(zone)
-
-        classifications = []
-        for disk, zone in zip(disks, zones):
-            result = self.classifier.classify(
-                antibiotic=disk.label,
-                zone_diameter_mm=zone.diameter_mm,
-            )
-            classifications.append(result)
-
+        zones = self._segment_all(image, disks, px_per_mm)
+        classifications = self._classify_all(disks, zones)
         annotated = draw_results(image.copy(), disks, zones, classifications)
 
         return AnalysisResult(
@@ -271,6 +241,46 @@ class BacterioScopePipeline:
             classifications=classifications,
             annotated_image=annotated,
         )
+
+    def _segment_all(
+        self,
+        image: NDArray[np.uint8],
+        disks: list[DiskResult],
+        px_per_mm: float,
+    ) -> list[ZoneResult]:
+        """Segment the inhibition zone for every detected disk.
+
+        Args:
+            image: Full BGR plate image.
+            disks: Detected disk list from DiskDetector.
+            px_per_mm: Calibration factor for pixel-to-mm conversion.
+
+        Returns:
+            List of ZoneResult objects in the same order as disks.
+        """
+        return [self.segmenter.segment(image, disk, px_per_mm) for disk in disks]
+
+    def _classify_all(
+        self,
+        disks: list[DiskResult],
+        zones: list[ZoneResult],
+    ) -> list[SusceptibilityResult]:
+        """Classify every disk-zone pair against the CLSI breakpoint table.
+
+        Args:
+            disks: Detected disks (provides the antibiotic label).
+            zones: Corresponding zone measurements (provides diameter_mm).
+
+        Returns:
+            List of SusceptibilityResult objects in the same order as disks.
+        """
+        return [
+            self.classifier.classify(
+                antibiotic=disk.label,
+                zone_diameter_mm=zone.diameter_mm,
+            )
+            for disk, zone in zip(disks, zones)
+        ]
 
     def analyze_safe(
         self,
