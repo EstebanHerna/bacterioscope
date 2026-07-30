@@ -178,6 +178,28 @@ def zone_diameter_stats(
     return {"mae_mm": mae, "pearson_r": r}
 
 
+def match_diameters_by_rank(
+    measured: Sequence[float],
+    reference: Sequence[float],
+) -> list[tuple[float, float]]:
+    """Pair measured and reference diameters by ascending rank order.
+
+    Phase 0 limitation: without per-disk antibiotic identification (available
+    in Phase 2 when YOLOv8 reads printed disk labels), disks cannot be matched
+    to reference rows by antibiotic name.  Sorting both lists ascending and
+    pairing by rank is an approximation that holds when zone-size ordering is
+    consistent between the pipeline and the reference system.
+
+    Args:
+        measured: Zone diameters measured by the pipeline (mm).
+        reference: Reference zone diameters from ground truth (mm).
+
+    Returns:
+        List of (measured_mm, reference_mm) tuples, both sorted ascending.
+    """
+    return list(zip(sorted(measured), sorted(reference)))
+
+
 def sir_confusion_matrix(
     predicted: Sequence[str],
     reference: Sequence[str],

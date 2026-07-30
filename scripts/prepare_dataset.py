@@ -220,6 +220,9 @@ def main() -> None:
         sys.exit(1)
 
     col_map = _detect_columns(headers)
+    print("  Column mapping detected:")
+    for role, idx in sorted(col_map.items()):
+        print(f"    {role:12s} <- col[{idx}]: {headers[idx]!r}")
     missing = {"id", "antibiotic", "diameter"} - col_map.keys()
     if missing:
         print(
@@ -231,6 +234,16 @@ def main() -> None:
         sys.exit(1)
 
     records = _process_rows(rows, col_map, images)
+    if not records:
+        print(
+            "Error: 0 records produced after processing.\n"
+            f"  Column mapping: {col_map}\n"
+            f"  Headers: {headers}\n"
+            "  Check that isolate identifiers in the CSV match image filenames.\n"
+            "  If column names differ from expected, update _detect_columns().",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     output_path = args.output_dir / "ground_truth.csv"
     _write_ground_truth(records, output_path)
     print(f"  Wrote {len(records)} records to {output_path}")

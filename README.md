@@ -76,7 +76,7 @@ The end-to-end pipeline is fully operational on the Hough + Otsu baseline.
 | Command-line interface (Typer + Rich) | Complete |
 | REST API (FastAPI, `/health` + `/analyze`) | Complete |
 | Clinical evaluation module (CA, EA, VME, ME, mE — ISO 20776-2) | Complete |
-| Test suite | 125 tests, all passing |
+| Test suite | 135 tests, all passing |
 | CI (GitHub Actions) | Green on Python 3.10, 3.11, 3.12 |
 | Static analysis | ruff, mypy strict, bandit, gitleaks |
 
@@ -202,7 +202,7 @@ bacterioscope/
 │   └── utils/
 │       ├── calibration.py   <- plate rim detection -> px/mm
 │       └── visualization.py <- annotated image output
-├── tests/                   <- 125 tests, mirrors src/ structure
+├── tests/                   <- 135 tests, mirrors src/ structure
 ├── scripts/
 │   ├── download_data.py        <- Dryad/UZH downloader with manual-step instructions
 │   ├── prepare_dataset.py      <- normalise UZH CSV for validation pipeline

@@ -11,22 +11,26 @@ It does NOT validate S/I/R classification because:
   - The UZH reference uses EUCAST 2023 breakpoints (from SIRscan automated reader).
   - BacterioScope classifies using CLSI M100-Ed33 2023 breakpoints.
   - EUCAST and CLSI breakpoints differ for many antibiotic-organism combinations.
-  - Comparing S/I/R categories across standards would produce misleading error rates.
+  - Comparing S/I/R categories across standards produces misleading error rates
+    that reflect the standard difference, not system performance.
+
+Full S/I/R validation against a CLSI-annotated reference is planned for Phase 3.
 
 Matching strategy (Phase 0 limitation)
 ---------------------------------------
 In Phase 0, the Hough-based detector cannot read the antibiotic label printed on each
-disk.  Disks are matched to reference measurements by sorting both sets of measurements
-by diameter (ascending) and pairing them by rank.  This is an approximation: it assumes
-that the rank order of zone sizes is preserved between the pipeline and the reference.
-Images where the detected disk count differs from the reference count are flagged and
-excluded from the EA calculation (logged to failed_images.log).  Full per-antibiotic
-matching becomes possible in Phase 2 when the YOLOv8 model reads disk labels.
+disk.  Disks are matched to reference measurements by sorting both sets of diameters
+ascending and pairing them by rank (see match_diameters_by_rank in metrics.py).
+This is an approximation: it assumes the rank order of zone sizes is preserved between
+the pipeline output and the reference.  Images where detected disk count differs from
+the reference count are flagged and excluded from the EA calculation (logged to
+failed_images.log).  Full per-antibiotic matching becomes possible in Phase 2 when
+the YOLOv8 model reads disk labels.
 
 Metrics reported
 -----------------
-  EA  — Essential Agreement: fraction of measurements within ±2 mm of reference.
-         Target ≥ 90% (ISO 20776-2 / EUCAST EDef 13.2 criterion).
+  EA  — Essential Agreement: fraction of measurements within +-2 mm of reference.
+         Target >= 90% (ISO 20776-2 / EUCAST EDef 13.2 criterion).
   MAE — Mean Absolute Error in mm.
   r   — Pearson correlation coefficient between measured and reference diameters.
 
@@ -50,9 +54,15 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+from numpy.typing import NDArray
 
-from bacterioscope.evaluation.metrics import essential_agreement, zone_diameter_stats
+from bacterioscope.detection.detector import DiskResult
+from bacterioscope.evaluation.metrics import (
+    match_diameters_by_rank,
+    zone_diameter_stats,
+)
 from bacterioscope.pipeline import BacterioScopePipeline, PipelineConfig
+from bacterioscope.segmentation.watershed import ZoneResult
 from bacterioscope.utils.image import save_image
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -77,11 +87,13 @@ def _parse_args() -> argparse.Namespace:
                    help="File to record images that could not be processed.")
     p.add_argument("--subset", type=int, default=0,
                    help="Limit to first N images (0 = all, useful for quick tests).")
+    p.add_argument("--max-annotated", type=int, default=0,
+                   help="Save at most N annotated images (0 = all). Minimum 5 recommended.")
     return p.parse_args()
 
 
 def _load_ground_truth(csv_path: Path) -> dict[str, list[dict[str, str]]]:
-    """Load ground truth CSV; return mapping of image_filename → list of reference rows."""
+    """Load ground truth CSV; return mapping of image_filename to list of reference rows."""
     if not csv_path.is_file():
         raise FileNotFoundError(
             f"Ground-truth CSV not found: {csv_path}\n"
@@ -107,12 +119,36 @@ def _find_image(image_dir: Path, filename: str) -> Path | None:
     return None
 
 
-def _match_by_rank(
-    measured: list[float],
-    reference: list[float],
-) -> list[tuple[float, float]]:
-    """Pair measured and reference diameters by ascending rank order."""
-    return list(zip(sorted(measured), sorted(reference)))
+def _annotate_with_reference(
+    image: NDArray[np.uint8],
+    disks: list[DiskResult],
+    zones: list[ZoneResult],
+    ref_mm_sorted: list[float],
+) -> NDArray[np.uint8]:
+    """Overlay reference zone diameters on a pipeline-annotated image.
+
+    Pairs each disk to its reference diameter using the same ascending rank
+    order as match_diameters_by_rank so labels align with the EA computation.
+
+    Args:
+        image: BGR annotated image from pipeline.draw_results().
+        disks: Detected disk results in pipeline order.
+        zones: Zone results in the same order as disks.
+        ref_mm_sorted: Reference diameters sorted ascending.
+
+    Returns:
+        Copy of image with cyan reference labels drawn above each disk.
+    """
+    overlay = image.copy()
+    ranked = sorted(zip(disks, zones), key=lambda p: p[1].diameter_mm)
+    for (disk, zone), ref in zip(ranked, ref_mm_sorted):
+        label = f"ref:{ref:.0f}mm"
+        cv2.putText(
+            overlay, label,
+            (disk.center_x - 22, disk.center_y - disk.radius_px - 8),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 200, 255), 1, cv2.LINE_AA,
+        )
+    return overlay
 
 
 def _run_image(
@@ -120,27 +156,38 @@ def _run_image(
     ref_rows: list[dict[str, str]],
     pipeline: BacterioScopePipeline,
     output_dir: Path,
+    save_annotated: bool = True,
 ) -> tuple[list[float], list[float], bool]:
-    """Run pipeline on one image and return (measured_mm, reference_mm, count_matched).
+    """Run pipeline on one image and return (measured_mm, reference_mm, count_ok).
 
-    Returns empty lists and False if the pipeline fails or disk counts differ.
+    Saves an annotated image to output_dir when save_annotated is True.
+    When disk counts match, the annotated image includes reference diameter
+    labels drawn via _annotate_with_reference.
+    Returns empty lists and False when disk count mismatches or pipeline fails.
     """
     result = pipeline.analyze(str(image_path))
     measured_mm = [z.diameter_mm for z in result.zones if z.diameter_mm > 0]
     ref_mm = [float(r["zone_diameter_mm_ref"]) for r in ref_rows]
+    count_ok = len(measured_mm) == len(ref_mm)
 
-    if result.annotated_image is not None:
-        out_path = output_dir / f"annotated_{image_path.stem}.jpg"
-        save_image(result.annotated_image, out_path)
+    if save_annotated and result.annotated_image is not None:
+        img: NDArray[np.uint8] = (
+            _annotate_with_reference(
+                result.annotated_image, result.disks, result.zones, sorted(ref_mm)
+            )
+            if count_ok
+            else result.annotated_image
+        )
+        save_image(img, output_dir / f"annotated_{image_path.stem}.jpg")
 
-    if len(measured_mm) != len(ref_mm):
+    if not count_ok:
         log.warning(
             "%s: detected %d disks, reference has %d — excluding from EA.",
             image_path.name, len(measured_mm), len(ref_mm),
         )
         return [], [], False
 
-    pairs = _match_by_rank(measured_mm, ref_mm)
+    pairs = match_diameters_by_rank(measured_mm, ref_mm)
     return [p[0] for p in pairs], [p[1] for p in pairs], True
 
 
@@ -160,7 +207,7 @@ def _write_report(
     mae: float,
     pearson_r: float,
 ) -> None:
-    """Write the Markdown validation report."""
+    """Write the Markdown validation report, replacing all pending placeholders."""
     lines = [
         "# BacterioScope Validation Report",
         "",
@@ -171,37 +218,60 @@ def _write_report(
         "",
         "This report validates **zone-diameter measurement accuracy only** "
         "(mm vs SIRscan reference).",
-        "S/I/R classification is NOT compared because the reference uses EUCAST 2023 "
-        "breakpoints while BacterioScope uses CLSI M100-Ed33 2023. "
-        "Comparing across standards would produce misleading error rates.",
+        "S/I/R classification is **not** compared because:",
         "",
-        "Disk-to-reference matching in Phase 0 uses rank-order pairing (sorted by diameter "
-        "ascending) because the Hough detector cannot read antibiotic labels. "
+        "- The UZH reference uses **EUCAST 2023** breakpoints (SIRscan automated reader).",
+        "- BacterioScope classifies using **CLSI M100-Ed33 2023** breakpoints.",
+        "- EUCAST and CLSI thresholds differ for many antibiotic-organism combinations "
+        "(e.g. ciprofloxacin S: EUCAST >= 25 mm vs CLSI >= 26 mm for Enterobacteriaceae).",
+        "- Comparing S/I/R across standards produces misleading discordance rates.",
+        "",
+        "Full S/I/R validation against a CLSI-annotated reference is planned for Phase 3.",
+        "",
+        "### Matching strategy — Phase 0 limitation",
+        "",
+        "Disks are matched to reference measurements by **rank-order pairing** "
+        "(both sets sorted ascending by diameter). "
+        "This is an approximation valid when zone-size rank order is consistent across images. "
         "Full per-antibiotic matching requires Phase 2 (YOLOv8 label reading).",
         "",
         "## Dataset summary",
         "",
-        f"| Item | Value |",
-        f"|---|---|",
+        "| Item | Value |",
+        "|---|---|",
+        "| Dataset | University of Zurich SIRscan (Egli et al., 2023) |",
+        "| Reference system | SIRscan automated reader (EUCAST 2023) |",
         f"| Total images evaluated | {n_images_total} |",
         f"| Images with matching disk count | {n_images_matched} |",
-        f"| Disk-antibiotic pairs used | {n_pairs} |",
-        f"| Images excluded (count mismatch) | {len(failures)} |",
+        f"| Disk-antibiotic pairs used for EA | {n_pairs} |",
+        f"| Images excluded (disk count mismatch or error) | {len(failures)} |",
         "",
         "## Measurement accuracy",
         "",
-        "| Metric | Value | Target |",
-        "|---|---|---|",
-        f"| Essential Agreement (EA, ±2 mm) | **{ea:.1%}** | ≥ 90% |",
-        f"| Mean Absolute Error (MAE) | **{mae:.2f} mm** | — |",
-        f"| Pearson r | **{pearson_r:.3f}** | — |",
+        "| Metric | Value | Target | Criterion |",
+        "|---|---|---|---|",
+        f"| Essential Agreement (EA, +-2 mm) | **{ea:.1%}** | >= 90% | "
+        "ISO 20776-2 / EUCAST EDef 13.2 |",
+        f"| Mean Absolute Error (MAE) | **{mae:.2f} mm** | — | mm |",
+        f"| Pearson r | **{pearson_r:.3f}** | — | — |",
+        "",
+        "### Definition of Essential Agreement used here",
+        "",
+        "Classical EA (ISO 20776-2) is defined for MIC broth microdilution: "
+        "the test-system MIC must fall within one two-fold dilution of the reference MIC. "
+        "BacterioScope measures zone diameters in mm, not MIC values. "
+        "EA is **adapted** as the fraction of diameter measurements within **+-2 mm** of the "
+        "SIRscan reference, consistent with EUCAST EDef 13.2 inter-laboratory reproducibility. "
+        "This adaptation must be disclosed when comparing to ISO 20776-2 EA figures.",
         "",
         "## Excluded images",
         "",
     ]
     if failures:
-        lines.append("The following images had a mismatch between detected disk count "
-                     "and reference disk count and were excluded from EA computation:")
+        lines.append(
+            f"{len(failures)} image(s) were excluded from EA: "
+            "disk count mismatch between pipeline and reference, or pipeline error."
+        )
         lines.append("")
         for f in failures[:20]:
             lines.append(f"- {f}")
@@ -213,20 +283,33 @@ def _write_report(
         "",
         "## Annotated examples",
         "",
-        "Annotated plate images are saved in `docs/figures/`.",
+        "Annotated plate images with detected halos (pipeline) and reference diameter "
+        "labels (cyan) are saved in `docs/figures/`. "
+        "Reference labels show the SIRscan measurement for each disk, paired by rank order.",
         "",
         "## How to reproduce",
         "",
         "```bash",
-        "python scripts/download_data.py          # follow manual download prompt",
-        "python scripts/prepare_dataset.py        # normalise CSV",
-        "python scripts/validate_measurement.py   # run validation",
+        "python scripts/download_data.py       # follow manual download prompt",
+        "python scripts/prepare_dataset.py     # normalise CSV",
+        "python scripts/validate_measurement.py  # compute EA / MAE / Pearson r",
+        "# Quick subset (first 20 images):",
+        "python scripts/validate_measurement.py --subset 20",
         "```",
+        "",
+        "Failures are logged to `data/processed/failed_images.log`.",
         "",
         "## Citation",
         "",
-        "Egli A, et al. (2023). Automated reading of disk diffusion antibiograms. "
-        "Dataset on Dryad. https://doi.org/10.5061/dryad.5dv41nsfj",
+        "> Egli A, Imkamp F, Amlang G, Brunner S, Albrich W, et al. (2023).",
+        "> *Automated reading of disk diffusion antibiograms.*",
+        "> Dataset on Dryad Digital Repository.",
+        "> https://doi.org/10.5061/dryad.5dv41nsfj",
+        "> License: CC0 1.0 Universal.",
+        "",
+        "---",
+        "",
+        "*This report is generated automatically by `scripts/validate_measurement.py`.*",
     ]
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -254,6 +337,7 @@ def main() -> None:
     all_reference: list[float] = []
     failures: list[str] = []
     n_matched = 0
+    n_annotated = 0
 
     for filename in filenames:
         img_path = _find_image(args.image_dir, filename)
@@ -261,13 +345,15 @@ def main() -> None:
             log.warning("Image not found: %s", filename)
             failures.append(f"{filename} — file not found")
             continue
+        save = args.max_annotated == 0 or n_annotated < args.max_annotated
         try:
             m_mm, r_mm, count_ok = _run_image(
-                img_path, ground_truth[filename], pipeline, args.output
+                img_path, ground_truth[filename], pipeline, args.output,
+                save_annotated=save,
             )
         except Exception as exc:
             log.warning("Pipeline failed on %s: %s", filename, exc)
-            failures.append(f"{filename} — pipeline error: {exc}")
+            failures.append(f"{filename} — pipeline error: {type(exc).__name__}: {exc}")
             continue
         if not count_ok:
             failures.append(f"{filename} — disk count mismatch")
@@ -275,6 +361,13 @@ def main() -> None:
         all_measured.extend(m_mm)
         all_reference.extend(r_mm)
         n_matched += 1
+        if save:
+            n_annotated += 1
+
+    log.info(
+        "Results: %d/%d images matched, %d excluded, %d annotated images saved.",
+        n_matched, len(filenames), len(failures), n_annotated,
+    )
 
     _write_failure_log(args.log_file, failures)
 
@@ -289,9 +382,7 @@ def main() -> None:
     mae = stats["mae_mm"]
     r = stats["pearson_r"]
 
-    log.info("Images matched: %d / %d", n_matched, len(filenames))
-    log.info("Disk pairs: %d", len(all_measured))
-    log.info("EA (±2 mm): %.1f%%", ea * 100)
+    log.info("EA (+-2 mm): %.1f%%", ea * 100)
     log.info("MAE: %.2f mm", mae)
     log.info("Pearson r: %.3f", r)
 
