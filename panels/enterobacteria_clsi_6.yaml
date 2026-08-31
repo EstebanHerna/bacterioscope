@@ -1,0 +1,30 @@
+# Compact 6-disk screening panel for Gram-negative Enterobacteriaceae.
+# Covers the most clinically relevant antibiotic classes for a first-line
+# susceptibility screen. Adapt positions to your laboratory's actual layout.
+#
+# Citation: CLSI. Performance Standards for Antimicrobial Susceptibility
+#   Testing, 33rd ed. CLSI supplement M100. Wayne, PA: CLSI; 2023.
+
+name: "Enterobacteria CLSI 6 (Screening)"
+description: "6-disk first-line screening panel for Enterobacteriaceae"
+organism_group: "Enterobacteriaceae"
+standard: "CLSI"
+disks:
+  - position: 1
+    antibiotic: "ampicillin"
+    disk_content_ug: 10
+  - position: 2
+    antibiotic: "ciprofloxacin"
+    disk_content_ug: 5
+  - position: 3
+    antibiotic: "ceftriaxone"
+    disk_content_ug: 30
+  - position: 4
+    antibiotic: "meropenem"
+    disk_content_ug: 10
+  - position: 5
+    antibiotic: "gentamicin"
+    disk_content_ug: 10
+  - position: 6
+    antibiotic: "trimethoprim-sulfamethoxazole"
+    disk_content_ug: 25
