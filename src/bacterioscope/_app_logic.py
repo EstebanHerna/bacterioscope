@@ -15,6 +15,36 @@ _UNASSIGNED = "-- Unassigned --"
 _ANTIBIOTIC_OPTIONS: list[str] = [_UNASSIGNED] + sorted(CLSI_2023_ENTEROBACTERIACEAE.keys())
 
 
+def reclassify_with_override(
+    zone_mm: float,
+    override_mm: float | None,
+    antibiotic: str,
+    classifier: CLSIClassifier,
+    disk_label: str = "",
+) -> tuple[SusceptibilityResult, str]:
+    """Reclassify a disk with an optional user-provided diameter override.
+
+    When override_mm is provided, it replaces the pipeline-measured diameter
+    for classification purposes.  The returned source string indicates whether
+    the diameter used was 'automatic' (pipeline) or 'manual' (user-corrected).
+
+    Args:
+        zone_mm: Diameter measured by the pipeline in mm.
+        override_mm: User-specified diameter in mm, or None to use zone_mm.
+        antibiotic: Antibiotic name or _UNASSIGNED sentinel.
+        classifier: Configured CLSIClassifier instance.
+        disk_label: Disk identifier used as fallback when antibiotic is unassigned.
+
+    Returns:
+        Tuple of (SusceptibilityResult, source) where source is 'manual' when
+        override_mm was applied and 'automatic' otherwise.
+    """
+    effective_mm = override_mm if override_mm is not None else zone_mm
+    source = "manual" if override_mm is not None else "automatic"
+    result = reclassify_with_assignment(effective_mm, antibiotic, classifier, disk_label)
+    return result, source
+
+
 def reclassify_with_assignment(
     zone_mm: float,
     antibiotic: str,
