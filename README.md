@@ -76,7 +76,10 @@ The end-to-end pipeline is fully operational on the Hough + Otsu baseline.
 | Command-line interface (Typer + Rich) | Complete |
 | REST API (FastAPI, `/health` + `/analyze`) | Complete |
 | Clinical evaluation module (CA, EA, VME, ME, mE — ISO 20776-2) | Complete |
-| Test suite | 135 tests, all passing |
+| Panel configuration (auto angular assignment from YAML, or manual per-disk) | Complete |
+| HTML report export (self-contained, print-to-PDF) | Complete |
+| Batch processing script (`cepa_replica_condicion.jpg` naming, CSV + error log) | Complete |
+| Test suite | 188 tests, all passing |
 | CI (GitHub Actions) | Green on Python 3.10, 3.11, 3.12 |
 | Static analysis | ruff, mypy strict, bandit, gitleaks |
 
@@ -90,7 +93,7 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for full detail.
 
 | Phase | Scope | Status |
 |---|---|---|
-| **F0** | End-to-end pipeline, Hough baseline, CLSI classifier, Streamlit demo, CLI, API, evaluation module, 107 tests, CI | **Complete** |
+| **F0** | End-to-end pipeline, Hough baseline, CLSI classifier, Streamlit demo, CLI, API, evaluation module, panel configuration, HTML reports, batch processing, 188 tests, CI | **Complete** |
 | **F1** | Curate and annotate the Dryad/UZH public dataset (225 Gram-negative isolates with clinical ground truth) | Planned |
 | **F2** | Train YOLOv8 to detect each disk and read its printed antibiotic label — eliminates manual assignment | Planned |
 | **F3** | Calibrate mm measurement using the 6 mm disk as physical reference; validate EA >=90%, CA >=90%, VME <=1.5% | Planned |
@@ -140,7 +143,7 @@ pip install -e ".[all,dev]"
 streamlit run src/bacterioscope/app.py
 ```
 
-Opens at `http://localhost:8501`. Upload a plate photograph (or use `docs/plate_original.png`) and assign antibiotic names per disk to see live S/I/R output.
+Opens at `http://localhost:8501`. Upload a plate photograph or click **Load example image** to analyse the built-in synthetic plate. Choose a fixed panel from the sidebar for automatic antibiotic assignment, or keep the default manual per-disk mode.
 
 ---
 
@@ -151,8 +154,30 @@ Opens at `http://localhost:8501`. Upload a plate photograph (or use `docs/plate_
 ```bash
 python -m bacterioscope analyze docs/plate_original.png
 python -m bacterioscope analyze plate.jpg --output annotated.jpg
+python -m bacterioscope analyze plate.jpg --panel enterobacteria_clsi_12 --report report.html
 python -m bacterioscope version
 ```
+
+The `--panel` flag auto-assigns antibiotic names by clockwise angular position from the 12 o'clock disk. A mismatch between detected disk count and panel size is reported as a warning without silently assigning wrong labels. The `--report` flag writes a self-contained HTML file (open in any browser and Ctrl+P to save as PDF).
+
+### Batch processing
+
+```bash
+python scripts/batch_analyze.py data/raw/images/ --output data/processed/ --panel enterobacteria_clsi_12
+```
+
+Expects filenames in `cepa_replica_condicion.jpg` format. Writes `results.csv` (one row per disk) and `errors.log`.
+
+### Panel configuration
+
+Panels are YAML files under `panels/` that declare a fixed antibiotic list ordered by clockwise position from 12 o'clock. Two panels are included:
+
+| Panel | Disks | Use case |
+|---|---|---|
+| `enterobacteria_clsi_12` | 12 | Full Enterobacteriaceae workup |
+| `enterobacteria_clsi_6` | 6 | Rapid screening panel |
+
+Custom panels can be added by creating `panels/<name>.yaml` with the same schema.
 
 ### REST API
 
@@ -195,19 +220,26 @@ bacterioscope/
 │   │   └── clsi.py          <- CLSIClassifier + CLSI 2023 breakpoints
 │   ├── evaluation/
 │   │   ├── metrics.py       <- CA, EA, VME, ME, mE
-│   │   └── report.py        <- Markdown + HTML report generation
+│   │   ├── report.py        <- Markdown + HTML report generation
+│   │   └── plate_report.py  <- self-contained per-plate HTML report (base64 image)
+│   ├── panels/
+│   │   └── manager.py       <- PanelManager: load YAML, assign by angular position
 │   ├── api/
 │   │   ├── routes.py        <- FastAPI endpoints
 │   │   └── schemas.py       <- Pydantic schemas
 │   └── utils/
 │       ├── calibration.py   <- plate rim detection -> px/mm
 │       └── visualization.py <- annotated image output
-├── tests/                   <- 135 tests, mirrors src/ structure
+├── panels/                  <- YAML panel configs (antibiotics by clockwise position)
+│   ├── enterobacteria_clsi_12.yaml
+│   └── enterobacteria_clsi_6.yaml
+├── tests/                   <- 188 tests, mirrors src/ structure
 ├── scripts/
 │   ├── download_data.py        <- Dryad/UZH downloader with manual-step instructions
 │   ├── prepare_dataset.py      <- normalise UZH CSV for validation pipeline
 │   ├── validate_measurement.py <- EA / MAE / Pearson r vs SIRscan reference
 │   ├── evaluate.py             <- batch S/I/R evaluation against labelled CSV
+│   ├── batch_analyze.py        <- folder batch processing (results.csv + errors.log)
 │   └── generate_demo.py        <- synthetic demo images in docs/
 ├── docs/
 │   ├── ROADMAP.md              <- phased development plan
@@ -247,6 +279,18 @@ python scripts/validate_measurement.py  # compute EA / MAE / Pearson r
 
 Results are written to [docs/VALIDATION_REPORT.md](docs/VALIDATION_REPORT.md).
 Annotated plate images are saved in `docs/figures/`.
+
+---
+
+## Streamlit Community Cloud deployment
+
+The repo ships deployment-ready configuration under `.streamlit/config.toml` and `requirements.txt`. To deploy:
+
+1. Push to a GitHub repository.
+2. Go to [share.streamlit.io](https://share.streamlit.io), connect the repo, and set the main file to `src/bacterioscope/app.py`.
+3. Streamlit Cloud installs `requirements.txt` automatically.
+
+The demo runs without YOLOv8 weights (falls back to HoughCircles). The built-in example image works immediately after deploy — no upload required to verify the deployment.
 
 ---
 
