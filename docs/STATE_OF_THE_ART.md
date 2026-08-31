@@ -15,7 +15,7 @@ evaluators, potential collaborators, and as background for the BDIC 2026 submiss
 | **SIRscan** (i2a) | Same family as ADAGIO; used in the UZH Dryad validation dataset | Same hardware and cost constraints | Commercial, proprietary |
 | **VITEK 2** (bioMérieux) | Fluorescence-based AST, not disk diffusion; fastest turnaround in high-complexity labs | USD 80 000+ capital cost; not disk diffusion; requires continuous reagent supply | Commercial, proprietary |
 | **BD Phoenix** (Becton Dickinson) | Automated broth microdilution | USD 60 000+; same supply-chain dependency | Commercial, proprietary |
-| **Pascucci et al. 2021** (app, *Nat. Commun.*) | Smartphone app for Kirby-Bauer reading in resource-limited settings; validated on clinical plates | Proof-of-concept; source code not published; not maintained or deployable; no CLSI/ISO integration; no early-reading capability | Academic paper only |
+| **Pascucci et al. 2021** (ASTimp, *Nat. Commun.*) | Smartphone app and C++/Python library for Kirby-Bauer reading; validated on clinical plates; source available at [github.com/mpascucci/AST-image-processing](https://github.com/mpascucci/AST-image-processing) | Halo measured as circle, not real contour; no per-antibiotic label reading in open implementation; no CLSI breakpoint integration; not maintained since 2022; Android-only app, no web/API interface | Apache 2.0, source public |
 | **Webber et al. 2022** (*J Clin Microbiol*) | Clinical study validating early (6 h and 10 h) disk-diffusion readings against 24 h standard | Pure clinical validation, not a software tool; no automation; no open implementation | Published evidence base |
 
 ---
