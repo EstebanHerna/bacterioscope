@@ -126,6 +126,10 @@ class AnalysisResult:
         flags: One list of flag strings per disk.  Possible flags:
             ``'low_circularity'``, ``'small_zone'``, ``'boundary'``,
             ``'overlap'``.  An empty inner list means no quality issues.
+        plate_center: (x, y) pixel coordinates of the estimated plate centre.
+            Computed as the centroid of detected disks, or the image centre
+            when no disks are found.  Used by PanelManager for angular
+            disk-position assignment.
     """
     image_path: str
     plate_diameter_px: float
@@ -136,6 +140,7 @@ class AnalysisResult:
     annotated_image: NDArray[np.uint8] | None = None
     original_image: NDArray[np.uint8] | None = None
     flags: list[list[str]] = field(default_factory=list)
+    plate_center: tuple[int, int] = field(default_factory=lambda: (0, 0))
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise the analysis result to a JSON-compatible dictionary.
@@ -160,6 +165,27 @@ class AnalysisResult:
                 for i, cls in enumerate(self.classifications)
             ],
         }
+
+
+def _estimate_plate_center(
+    disks: list[DiskResult],
+    image_shape: tuple[int, ...],
+) -> tuple[int, int]:
+    """Estimate the plate centre from disk centroids or image centre.
+
+    Args:
+        disks: Detected disks (may be empty).
+        image_shape: (height, width, ...) of the image array.
+
+    Returns:
+        (x, y) pixel coordinates of the estimated plate centre.
+    """
+    h, w = image_shape[:2]
+    if disks:
+        cx = int(np.mean([d.center_x for d in disks]))
+        cy = int(np.mean([d.center_y for d in disks]))
+        return cx, cy
+    return w // 2, h // 2
 
 
 class BacterioScopePipeline:
@@ -236,6 +262,7 @@ class BacterioScopePipeline:
         classifications = self._classify_all(disks, zones)
         flags = self._compute_flags(disks, zones, image.shape)
         annotated = draw_results(image.copy(), disks, zones, classifications, flags)
+        plate_center = _estimate_plate_center(disks, image.shape)
 
         return AnalysisResult(
             image_path=str(image_path),
@@ -247,6 +274,7 @@ class BacterioScopePipeline:
             annotated_image=annotated,
             original_image=original,
             flags=flags,
+            plate_center=plate_center,
         )
 
     def _segment_all(
@@ -341,6 +369,42 @@ class BacterioScopePipeline:
             )
             for disk, zone in zip(disks, zones)
         ]
+
+    def reclassify_with_labels(
+        self,
+        result: AnalysisResult,
+        labels: list[str],
+    ) -> AnalysisResult:
+        """Return a new AnalysisResult with antibiotics replaced by labels.
+
+        Used after panel assignment to re-run the CLSI classifier with the
+        panel-assigned antibiotic names.  All other fields are copied from
+        the original result unchanged.
+
+        Args:
+            result: Completed AnalysisResult from analyze().
+            labels: Antibiotic names in pipeline disk order (same length as
+                result.disks).
+
+        Returns:
+            New AnalysisResult with updated classifications.
+        """
+        new_cls = [
+            self.classifier.classify(antibiotic=label, zone_diameter_mm=z.diameter_mm)
+            for label, z in zip(labels, result.zones)
+        ]
+        return AnalysisResult(
+            image_path=result.image_path,
+            plate_diameter_px=result.plate_diameter_px,
+            px_per_mm=result.px_per_mm,
+            disks=result.disks,
+            zones=result.zones,
+            classifications=new_cls,
+            annotated_image=result.annotated_image,
+            original_image=result.original_image,
+            flags=result.flags,
+            plate_center=result.plate_center,
+        )
 
     def analyze_safe(
         self,
