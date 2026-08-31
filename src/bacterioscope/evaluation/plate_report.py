@@ -13,10 +13,10 @@ from __future__ import annotations
 import base64
 import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import cv2
-import numpy as np
+import numpy.typing as npt
 
 if TYPE_CHECKING:
     from bacterioscope.pipeline import AnalysisResult
@@ -46,7 +46,7 @@ _CSS = (
 )
 
 
-def _image_to_b64(image: np.ndarray) -> str:
+def _image_to_b64(image: npt.NDArray[Any]) -> str:
     ok, buf = cv2.imencode(".png", image)
     if not ok:
         return ""

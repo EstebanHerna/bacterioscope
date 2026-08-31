@@ -568,6 +568,8 @@ def main() -> None:
     elif uploaded is not None:
         _sync_for_new_image(f"{uploaded.name}:{uploaded.size}")
         result = _run_pipeline(pipeline, uploaded)
+    elif "bs_result" in st.session_state:
+        result = cast(AnalysisResult, st.session_state["bs_result"])
     else:
         st.markdown(
             '<div class="bs-welcome">'

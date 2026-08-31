@@ -181,7 +181,7 @@ def _process_single_dir(
         print(f"    No measurements file found in {data_dir}, skipping.", file=sys.stderr)
         return []
     if meas_file.suffix != ".csv":
-        print(f"    Excel format not supported without openpyxl. Convert to CSV.", file=sys.stderr)
+        print("    Excel format not supported without openpyxl. Convert to CSV.", file=sys.stderr)
         return []
     headers, rows = _read_csv_flexible(meas_file)
     col_map = _detect_columns(headers)
