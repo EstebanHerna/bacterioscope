@@ -21,8 +21,12 @@ from bacterioscope._app_logic import (
     reclassify_with_override,
 )
 from bacterioscope.classification.clsi import CLSIClassifier, SusceptibilityResult
+from bacterioscope.evaluation.plate_report import generate_plate_html
+from bacterioscope.panels.manager import PanelManager
 from bacterioscope.pipeline import AnalysisResult, BacterioScopePipeline, PipelineConfig
 from bacterioscope.utils.visualization import draw_results
+
+_EXAMPLE_IMAGE = Path(__file__).parent.parent.parent / "docs" / "plate_original.png"
 
 # ---------------------------------------------------------------------------
 # Design tokens — single source of truth for CSS variables
@@ -235,10 +239,25 @@ def _run_pipeline(
         tmp_path.unlink(missing_ok=True)
 
 
+def _run_pipeline_from_path(
+    pipeline: BacterioScopePipeline, image_path: Path
+) -> AnalysisResult | None:
+    if "bs_result" in st.session_state:
+        return cast(AnalysisResult, st.session_state["bs_result"])
+    try:
+        with st.spinner("Analyzing..."):
+            result = pipeline.analyze(image_path)
+        st.session_state["bs_result"] = result
+        return result
+    except (ValueError, FileNotFoundError) as exc:
+        st.error(f"Analysis failed: {exc}")
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Sidebar
 # ---------------------------------------------------------------------------
-def _sidebar() -> tuple[float, str]:
+def _sidebar() -> tuple[float, str, str | None]:
     st.sidebar.markdown(
         '<div class="bs-sb-brand">BacterioScope<span class="bs-sb-v">v0.1</span></div>',
         unsafe_allow_html=True,
@@ -249,9 +268,18 @@ def _sidebar() -> tuple[float, str]:
     )
     organism = st.sidebar.selectbox("Organism group", options=["Enterobacteriaceae"], index=0)
     st.sidebar.markdown('<hr class="bs-sb-hr">', unsafe_allow_html=True)
+    st.sidebar.markdown('<div class="bs-sb-sec">Disk Assignment</div>', unsafe_allow_html=True)
+    pm = PanelManager()
+    panel_opts = ["Manual"] + pm.list_panels()
+    panel_sel = st.sidebar.selectbox(
+        "Mode", panel_opts,
+        help="Manual: assign antibiotics per disk. Panel: auto-assign by angular position."
+    )
+    panel_name = None if str(panel_sel) == "Manual" else str(panel_sel)
+    st.sidebar.markdown('<hr class="bs-sb-hr">', unsafe_allow_html=True)
     st.sidebar.markdown('<div class="bs-sb-refs">CLSI M100-Ed33 (2023)<br>ISO 20776-2</div>',
                         unsafe_allow_html=True)
-    return float(plate_mm), str(organism)
+    return float(plate_mm), str(organism), panel_name
 
 
 def _vis_sidebar() -> _VisConfig:
@@ -278,9 +306,9 @@ def _vis_sidebar() -> _VisConfig:
 # Display helpers
 # ---------------------------------------------------------------------------
 def _is_hough_mode(result: AnalysisResult) -> bool:
-    if not result.classifications:
+    if not result.disks:
         return True
-    return any(c.antibiotic.startswith("disk_") for c in result.classifications)
+    return result.disks[0].confidence == 0.0
 
 
 def _mode_indicator(is_hough: bool) -> None:
@@ -356,12 +384,16 @@ def _compose_image(
 def _effective_classifications(
     result: AnalysisResult,
     classifier: CLSIClassifier,
+    panel_labels: list[str] | None = None,
 ) -> list[SusceptibilityResult]:
     if not _is_hough_mode(result):
         return result.classifications
     effective = []
     for i, zone in enumerate(result.zones):
-        chosen = st.session_state.get(_assignment_key(i), _UNASSIGNED)
+        if panel_labels is not None and i < len(panel_labels):
+            chosen = panel_labels[i]
+        else:
+            chosen = st.session_state.get(_assignment_key(i), _UNASSIGNED)
         raw_override = st.session_state.get(_override_key(i))
         override_mm = float(raw_override) if raw_override is not None else None
         cls, _ = reclassify_with_override(
@@ -402,6 +434,7 @@ def _results_table(
 def _hough_table(
     result: AnalysisResult,
     effective: list[SusceptibilityResult],
+    panel_labels: list[str] | None = None,
 ) -> None:
     if not result.zones:
         st.markdown(
@@ -434,10 +467,18 @@ def _hough_table(
             step=0.5, format="%.1f", label_visibility="collapsed", key=_override_key(i),
         )
         is_manual = abs(float(raw_override) - zone.diameter_mm) > 0.01
-        c4.selectbox(
-            f"ab_{i}", _ANTIBIOTIC_OPTIONS, key=_assignment_key(i),
-            label_visibility="collapsed",
-        )
+        if panel_labels is not None and i < len(panel_labels):
+            c4.markdown(
+                f'<div class="bs-td-name">{panel_labels[i]}'
+                '<span class="bs-badge bs-badge--manual" style="margin-left:6px">panel</span>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            c4.selectbox(
+                f"ab_{i}", _ANTIBIOTIC_OPTIONS, key=_assignment_key(i),
+                label_visibility="collapsed",
+            )
         badge = _category_badge(effective[i].category)
         manual_tag = '<span class="bs-badge bs-badge--manual">manual</span>' if is_manual else ""
         c5.markdown(
@@ -448,21 +489,11 @@ def _hough_table(
 def _download_button(
     result: AnalysisResult, classifications: list[SusceptibilityResult]
 ) -> None:
-    flags = result.flags or []
-    lines = (
-        ["# BacterioScope Analysis Report", "",
-         f"Calibration: {result.px_per_mm:.3f} px/mm",
-         f"Plate diameter: {result.plate_diameter_px:.0f} px", "",
-         "| Antibiotic | Zone (mm) | Category | Flags |",
-         "|------------|-----------|----------|-------|"]
-        + [
-            f"| {c.antibiotic} | {c.zone_diameter_mm:.1f} | {c.category}"
-            f" | {', '.join(flags[i]) if i < len(flags) else ''} |"
-            for i, c in enumerate(classifications)
-        ]
-    )
+    import dataclasses
+    display = dataclasses.replace(result, classifications=classifications)
+    html = generate_plate_html(display)
     st.download_button(
-        "Download report", "\n".join(lines), "bacterioscope_report.md", "text/markdown"
+        "Download HTML report", html.encode(), "bacterioscope_report.html", "text/html"
     )
 
 
@@ -470,10 +501,11 @@ def _show_results(
     result: AnalysisResult,
     classifier: CLSIClassifier,
     vis: _VisConfig,
+    panel_labels: list[str] | None = None,
 ) -> None:
     col_img, col_data = st.columns([10, 9], gap="large")
     is_hough = _is_hough_mode(result)
-    effective = _effective_classifications(result, classifier)
+    effective = _effective_classifications(result, classifier, panel_labels)
     with col_img:
         st.markdown('<div class="bs-sec">Plate</div>', unsafe_allow_html=True)
         display_img = _compose_image(result, vis)
@@ -490,7 +522,7 @@ def _show_results(
         if result.zones:
             st.markdown('<hr class="bs-hr">', unsafe_allow_html=True)
         if is_hough:
-            _hough_table(result, effective)
+            _hough_table(result, effective, panel_labels)
         else:
             _results_table(result.classifications, result.flags or [])
         if result.zones:
@@ -511,35 +543,62 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    plate_mm, organism = _sidebar()
+    plate_mm, organism, panel_name = _sidebar()
     vis = _vis_sidebar()
     pipeline = _build_pipeline(plate_mm, organism)
 
-    uploaded = st.file_uploader(
-        "plate", type=["jpg", "jpeg", "png", "bmp", "tiff"],
-        label_visibility="collapsed",
-    )
+    col_up, col_ex = st.columns([4, 1])
+    with col_up:
+        uploaded = st.file_uploader(
+            "plate", type=["jpg", "jpeg", "png", "bmp", "tiff"],
+            label_visibility="collapsed",
+        )
+    with col_ex:
+        use_example = st.button("Use example image", use_container_width=True)
+
     st.markdown(
         '<div class="bs-upload-hint">'
         "Upload a raw, unprocessed plate photograph (JPEG, PNG, TIFF).</div>",
         unsafe_allow_html=True,
     )
 
-    if uploaded is None:
+    if use_example and _EXAMPLE_IMAGE.exists():
+        _sync_for_new_image("__example__")
+        result = _run_pipeline_from_path(pipeline, _EXAMPLE_IMAGE)
+    elif uploaded is not None:
+        _sync_for_new_image(f"{uploaded.name}:{uploaded.size}")
+        result = _run_pipeline(pipeline, uploaded)
+    else:
         st.markdown(
             '<div class="bs-welcome">'
             '<div class="w-title">Upload a plate photograph to begin</div>'
-            '<div class="w-desc">Use an unprocessed image directly from the camera.</div>'
+            '<div class="w-desc">Use an unprocessed image directly from the camera, '
+            "or click 'Use example image'.</div>"
             "</div>",
             unsafe_allow_html=True,
         )
         return
 
-    _sync_for_new_image(f"{uploaded.name}:{uploaded.size}")
-    result = _run_pipeline(pipeline, uploaded)
     if result is None:
         return
-    _show_results(result, pipeline.classifier, vis)
+
+    panel_labels: list[str] | None = None
+    if panel_name is not None:
+        pm = PanelManager()
+        try:
+            panel_cfg = pm.load(panel_name)
+            assigned = pm.assign(result.disks, panel_cfg, result.plate_center)
+            if assigned is None:
+                st.warning(
+                    f"Panel '{panel_name}' has {len(panel_cfg.antibiotics)} disks "
+                    f"but {len(result.disks)} detected. Using manual assignment."
+                )
+            else:
+                panel_labels = assigned
+        except FileNotFoundError as exc:
+            st.error(str(exc))
+
+    _show_results(result, pipeline.classifier, vis, panel_labels)
 
 
 if __name__ == "__main__":
