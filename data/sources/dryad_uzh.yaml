@@ -1,0 +1,17 @@
+name: dryad_uzh
+display_name: "Dryad/UZH SIRscan Dataset"
+path: data/raw/dryad_uzh
+format: csv
+standard: EUCAST
+license: "Creative Commons Zero v1.0 Universal (CC0)"
+license_url: "https://creativecommons.org/publicdomain/zero/1.0/"
+citation: >
+  Egli A, Imkamp F, Amlang G, Brunner S, Albrich W, et al. (2023).
+  Automated reading of disk diffusion antibiograms.
+  Dryad Digital Repository. doi:10.5061/dryad.5dv41nsfj
+n_isolates: 225
+n_phenotypic_categories: 862
+notes: >
+  225 Gram-negative clinical isolates. Reference measurements produced by
+  the SIRscan automated reader using EUCAST 2023 breakpoints.
+  Download: python scripts/download_data.py

@@ -1,0 +1,16 @@
+name: roboflow_astimp
+display_name: "ASTIMP — Roboflow Universe annotated dataset"
+path: data/raw/roboflow_astimp
+format: roboflow_coco
+standard: unknown
+license: "CC BY 4.0"
+license_url: "https://creativecommons.org/licenses/by/4.0/"
+citation: >
+  AST-IMP dataset. Roboflow Universe. Retrieved 2024.
+  https://universe.roboflow.com/ast-imp/astimp
+notes: >
+  Annotated disk diffusion plate images with bounding boxes and trained
+  object detection model. Requires a Roboflow API key to download.
+  See docs/FUENTES_DATOS.md for download instructions.
+api_required: true
+download_url: "https://universe.roboflow.com/ast-imp/astimp"

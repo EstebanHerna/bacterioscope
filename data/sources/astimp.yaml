@@ -1,0 +1,21 @@
+name: astimp
+display_name: "ASTimp — Pascucci et al. 2021 test images"
+path: data/raw/astimp
+format: image_dir
+standard: unknown
+license: "Apache License 2.0"
+license_url: "https://www.apache.org/licenses/LICENSE-2.0"
+citation: >
+  Pascucci M, Royer G, Adamek J, Al Asmar M, Aristizabal D, et al. (2021).
+  AI-based mobile application to fight antibiotic resistance.
+  Nature Communications 12:1173. doi:10.1038/s41467-021-21187-3
+source_repo: "https://github.com/mpascucci/AST-image-processing"
+notes: >
+  Test plate images from the ASTimp C++/Python library. No numeric reference
+  measurements are provided — these images are used for visual validation and
+  detector benchmarking only.
+  Import: python scripts/import_astimp.py
+disclaimer: >
+  By using this dataset you agree to the Apache 2.0 license terms and must
+  cite the Nature Communications 2021 paper in any publication. See the
+  repository README for the full disclaimer text before running the import.

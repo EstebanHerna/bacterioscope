@@ -57,6 +57,7 @@ dev = [
     "pre-commit>=3.5",
     "bandit[toml]>=1.7",
     "pip-audit>=2.7",
+    "PyYAML>=6.0",
     "types-PyYAML>=6.0",
 ]
 all = ["bacterioscope[ml,api,ui]"]
