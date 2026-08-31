@@ -1,28 +1,23 @@
 """Annotated image generation for BacterioScope analysis results.
 
-This module draws detection and classification output on top of the original
-plate photograph to produce the visual report shown in the Streamlit demo and
-saved by the CLI with the ``--output`` flag.
-
 What gets drawn
 ---------------
 For every antibiotic disk detected on the plate this module draws:
 
-- **Outer coloured circle** — the boundary of the segmented inhibition zone.
-- **Inner white circle** — the boundary of the paper antibiotic disk itself.
-- **Text label** — antibiotic name, measured zone diameter, and S/I/R category,
-  positioned above the disk.
+- **Zone boundary** — the real segmented contour from the inhibition zone mask
+  (or a circle fallback when no mask is available).
+- **Disk circle** — the paper disk boundary, always drawn as a thin circle.
+- **Text label** — antibiotic name, zone diameter in mm, and S/I/R category.
+- **Flag ring** — an amber warning ring drawn outside the zone for disks that
+  triggered one or more quality flags (low circularity, small zone, boundary
+  contact, or overlap with another zone).
 
 Colour coding (clinical convention)
 ------------------------------------
-================  =========  =====================================
-Category          Colour     Meaning
-================  =========  =====================================
-S (Susceptible)   Green      Standard treatment likely effective.
-I (Intermediate)  Amber      May work with higher dose / local use.
-R (Resistant)     Red        Antibiotic unlikely to be effective.
-UNKNOWN           Grey       No CLSI breakpoint found for this disk.
-================  =========  =====================================
+S (Susceptible): muted green — standard treatment likely effective.
+I (Intermediate): muted amber — may work at higher dose or local site.
+R (Resistant): muted red — antibiotic unlikely to be effective.
+UNKNOWN: grey — no CLSI breakpoint found for this disk.
 """
 
 from __future__ import annotations
@@ -35,12 +30,54 @@ from bacterioscope.classification.clsi import SusceptibilityResult
 from bacterioscope.detection.detector import DiskResult
 from bacterioscope.segmentation.watershed import ZoneResult
 
-COLORS = {
-    "S": (0, 200, 0),
-    "I": (0, 200, 255),
-    "R": (0, 0, 220),
-    "UNKNOWN": (128, 128, 128),
+COLORS: dict[str, tuple[int, int, int]] = {
+    "S": (80, 180, 70),          # muted green in BGR
+    "I": (45, 150, 205),         # muted amber in BGR
+    "R": (60, 60, 185),          # muted red in BGR
+    "UNKNOWN": (110, 110, 110),
 }
+
+_FLAG_COLOR: tuple[int, int, int] = (45, 135, 200)   # amber-orange warning in BGR
+_FLAG_RING_OFFSET: int = 6                             # pixels beyond zone radius
+
+
+def _draw_zone_contour(
+    image: NDArray[np.uint8],
+    zone: ZoneResult,
+    color: tuple[int, int, int],
+    thickness: int = 2,
+) -> None:
+    """Draw the real segmented zone boundary, falling back to a circle.
+
+    Uses the binary mask stored in ZoneResult to extract the actual contour
+    produced by the watershed segmenter.  When the mask is unavailable,
+    draws a circle with radius_px as a fallback.
+
+    Args:
+        image: BGR image array modified in place.
+        zone: Zone measurement result containing the mask and centroid.
+        color: BGR colour tuple for the contour.
+        thickness: Line thickness in pixels.
+    """
+    if zone.mask is not None:
+        contours, _ = cv2.findContours(zone.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if contours:
+            cv2.drawContours(image, contours, -1, color, thickness)
+            return
+    if zone.radius_px > 0:
+        cv2.circle(image, (zone.center_x, zone.center_y), int(zone.radius_px), color, thickness)
+
+
+def _draw_flag_ring(image: NDArray[np.uint8], zone: ZoneResult) -> None:
+    """Draw an amber warning ring just outside a flagged zone.
+
+    Args:
+        image: BGR image array modified in place.
+        zone: Zone whose measurement triggered one or more quality flags.
+    """
+    r = int(zone.radius_px) + _FLAG_RING_OFFSET
+    if r > 0:
+        cv2.circle(image, (zone.center_x, zone.center_y), r, _FLAG_COLOR, 2)
 
 
 def draw_results(
@@ -48,50 +85,51 @@ def draw_results(
     disks: list[DiskResult],
     zones: list[ZoneResult],
     classifications: list[SusceptibilityResult],
+    flags: list[list[str]] | None = None,
+    stroke_color: tuple[int, int, int] | None = None,
 ) -> NDArray[np.uint8]:
     """Overlay detection and classification results on a plate image.
 
-    Iterates over the parallel ``disks``, ``zones``, and ``classifications``
-    lists and draws three elements per disk: the zone circle, the disk circle,
-    and a text label.  Modifies ``image`` in place and also returns it.
+    Draws the real zone contour (from the segmentation mask when available),
+    the disk circle, and a text label for each detected disk.  Disks with
+    non-empty flags receive an additional amber warning ring drawn outside
+    their zone boundary.
 
     Args:
-        image: BGR image array to annotate.  Pass a ``.copy()`` if you need
-            to preserve the original unmodified.
-        disks: One ``DiskResult`` per detected disk (position and size).
-        zones: One ``ZoneResult`` per disk — contains the segmented zone
-            radius in pixels and the measured diameter in mm.
-        classifications: One ``SusceptibilityResult`` per disk — contains the
-            antibiotic name, zone diameter, and S/I/R category.
+        image: BGR image array to annotate. Pass a ``.copy()`` to preserve
+            the original.
+        disks: One DiskResult per detected disk (position and radius).
+        zones: One ZoneResult per disk — contains the segmentation mask and
+            zone measurements.
+        classifications: One SusceptibilityResult per disk — S/I/R category
+            and CLSI breakpoints used.
+        flags: Optional list of flag lists, one per disk. Each inner list
+            contains strings such as 'low_circularity', 'small_zone',
+            'boundary', 'overlap'. Flagged disks receive an amber warning ring.
+            Pass None or an empty list to draw no flags.
+        stroke_color: When provided, overrides the S/I/R colour for all zone
+            boundaries. Useful for uniform-colour overlay modes in the UI.
+            Pass None to use the category colour (default).
 
     Returns:
-        The annotated BGR image (the same array that was passed in).
+        The annotated BGR image (same array that was passed in).
     """
-    for disk, zone, cls in zip(disks, zones, classifications):
-        color = COLORS.get(cls.category, COLORS["UNKNOWN"])
+    for idx, (disk, zone, cls) in enumerate(zip(disks, zones, classifications)):
+        color = stroke_color if stroke_color is not None \
+            else COLORS.get(cls.category, COLORS["UNKNOWN"])
+        disk_flags = flags[idx] if flags is not None and idx < len(flags) else []
 
-        if zone.radius_px > 0:
-            cv2.circle(
-                image,
-                (zone.center_x, zone.center_y),
-                int(zone.radius_px),
-                color,
-                2,
-            )
+        if disk_flags:
+            _draw_flag_ring(image, zone)
 
-        cv2.circle(image, (disk.center_x, disk.center_y), disk.radius_px, (255, 255, 255), 2)
+        _draw_zone_contour(image, zone, color)
+        cv2.circle(image, (disk.center_x, disk.center_y), disk.radius_px, (210, 210, 210), 1)
 
         label = f"{cls.antibiotic}: {cls.zone_diameter_mm:.1f}mm ({cls.category})"
-        label_y = disk.center_y - disk.radius_px - 10
         cv2.putText(
-            image,
-            label,
-            (disk.center_x - 60, label_y),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            color,
-            1,
-            cv2.LINE_AA,
+            image, label,
+            (disk.center_x - 60, disk.center_y - disk.radius_px - 10),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1, cv2.LINE_AA,
         )
 
     return image
