@@ -106,26 +106,26 @@ class PipelineConfig:
 class AnalysisResult:
     """Complete output from one BacterioScope pipeline run.
 
-    The three list fields (``disks``, ``zones``, ``classifications``) are
-    **parallel** — index ``i`` in each list refers to the same physical
+    The four list fields (``disks``, ``zones``, ``classifications``, ``flags``)
+    are **parallel** — index ``i`` in each list refers to the same physical
     antibiotic disk on the plate.
 
     Attributes:
         image_path: Absolute path of the input image file.
-        plate_diameter_px: Detected plate diameter in pixels.  Divide by
-            ``px_per_mm`` to verify it matches the expected physical size.
-        px_per_mm: Calibration factor — pixels per millimetre.  Divide any
-            pixel measurement by this value to convert to millimetres.
-        disks: One ``DiskResult`` per detected disk.  Contains position,
-            size, label, and confidence.
-        zones: One ``ZoneResult`` per disk.  Contains the inhibition zone
-            diameter in both pixels and mm.
-        classifications: One ``SusceptibilityResult`` per disk.  Contains
-            the antibiotic name, zone diameter, S/I/R category, and the CLSI
-            breakpoint thresholds used.
-        annotated_image: BGR copy of the input image with coloured circles
-            and text labels drawn by ``draw_results()``.  ``None`` if
-            annotation failed.
+        plate_diameter_px: Detected plate diameter in pixels.
+        px_per_mm: Calibration factor — pixels per millimetre.
+        disks: One ``DiskResult`` per detected disk.
+        zones: One ``ZoneResult`` per disk — zone diameter in pixels and mm.
+        classifications: One ``SusceptibilityResult`` per disk — S/I/R category
+            and CLSI breakpoint thresholds.
+        annotated_image: BGR copy of the input image with contours and labels
+            drawn by ``draw_results()``.  ``None`` if annotation failed.
+        original_image: Unmodified BGR copy of the input image, stored for
+            the UI's opacity/toggle visualisation controls.  ``None`` if the
+            image could not be stored (e.g. memory constraints).
+        flags: One list of flag strings per disk.  Possible flags:
+            ``'low_circularity'``, ``'small_zone'``, ``'boundary'``,
+            ``'overlap'``.  An empty inner list means no quality issues.
     """
     image_path: str
     plate_diameter_px: float
@@ -134,14 +134,16 @@ class AnalysisResult:
     zones: list[ZoneResult] = field(default_factory=list)
     classifications: list[SusceptibilityResult] = field(default_factory=list)
     annotated_image: NDArray[np.uint8] | None = None
+    original_image: NDArray[np.uint8] | None = None
+    flags: list[list[str]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise the analysis result to a JSON-compatible dictionary.
 
         Returns:
             Dictionary with keys: ``image_path``, ``plate_diameter_px``,
-            ``px_per_mm``, and ``results`` (a list of per-disk records with
-            antibiotic name, zone diameter, classification, and breakpoints).
+            ``px_per_mm``, and ``results`` (per-disk records with antibiotic
+            name, zone diameter, classification, breakpoints, and flags).
         """
         return {
             "image_path": self.image_path,
@@ -153,8 +155,9 @@ class AnalysisResult:
                     "zone_diameter_mm": round(cls.zone_diameter_mm, 1),
                     "classification": cls.category,
                     "breakpoints": cls.breakpoints,
+                    "flags": self.flags[i] if i < len(self.flags) else [],
                 }
-                for cls in self.classifications
+                for i, cls in enumerate(self.classifications)
             ],
         }
 
@@ -228,9 +231,11 @@ class BacterioScopePipeline:
             median_radius = float(np.median([d.radius_px for d in disks]))
             px_per_mm = calibrate_from_disk_radius_px(median_radius, self.config.disk_diameter_mm)
 
+        original = image.copy()
         zones = self._segment_all(image, disks, px_per_mm)
         classifications = self._classify_all(disks, zones)
-        annotated = draw_results(image.copy(), disks, zones, classifications)
+        flags = self._compute_flags(disks, zones, image.shape)
+        annotated = draw_results(image.copy(), disks, zones, classifications, flags)
 
         return AnalysisResult(
             image_path=str(image_path),
@@ -240,6 +245,8 @@ class BacterioScopePipeline:
             zones=zones,
             classifications=classifications,
             annotated_image=annotated,
+            original_image=original,
+            flags=flags,
         )
 
     def _segment_all(
@@ -259,6 +266,59 @@ class BacterioScopePipeline:
             List of ZoneResult objects in the same order as disks.
         """
         return [self.segmenter.segment(image, disk, px_per_mm) for disk in disks]
+
+    def _compute_flags(
+        self,
+        disks: list[DiskResult],
+        zones: list[ZoneResult],
+        image_shape: tuple[int, ...],
+    ) -> list[list[str]]:
+        """Compute quality flags for each disk-zone pair.
+
+        Flags indicate measurements that warrant human review.  An empty inner
+        list means no quality issues were detected for that disk.
+
+        Flag meanings:
+            low_circularity: zone contour circularity < 0.7, suggesting an
+                irregular or asymmetric inhibition pattern.
+            small_zone: zone diameter < 6 mm (smaller than the physical disk
+                itself), likely a detection error or fully resistant organism.
+            boundary: zone extends to or beyond the image edge, truncating the
+                measurement.
+            overlap: zone overlaps with the zone of an adjacent disk.
+
+        Args:
+            disks: Detected disk positions.
+            zones: Corresponding zone measurements.
+            image_shape: Shape tuple of the full plate image (h, w, ...).
+
+        Returns:
+            List of flag lists, one per disk, in the same order as disks.
+        """
+        h, w = image_shape[:2]
+        flags: list[list[str]] = [[] for _ in disks]
+        for i, (_, zone) in enumerate(zip(disks, zones)):
+            if zone.diameter_mm > 0 and zone.circularity < 0.7:
+                flags[i].append("low_circularity")
+            if 0 < zone.diameter_mm < 6.0:
+                flags[i].append("small_zone")
+            if zone.radius_px > 0:
+                r = int(zone.radius_px)
+                if zone.center_x - r < 0 or zone.center_y - r < 0 \
+                        or zone.center_x + r > w or zone.center_y + r > h:
+                    flags[i].append("boundary")
+        for i in range(len(disks)):
+            for j in range(i + 1, len(disks)):
+                dist = float(np.sqrt(
+                    (disks[i].center_x - disks[j].center_x) ** 2
+                    + (disks[i].center_y - disks[j].center_y) ** 2
+                ))
+                if dist < zones[i].radius_px + zones[j].radius_px:
+                    if "overlap" not in flags[i]:
+                        flags[i].append("overlap")
+                    if "overlap" not in flags[j]:
+                        flags[j].append("overlap")
+        return flags
 
     def _classify_all(
         self,
