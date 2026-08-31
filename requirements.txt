@@ -1,0 +1,13 @@
+# Minimal dependencies for Streamlit Community Cloud deployment.
+# This file is read by Streamlit Cloud during deployment.
+# For full installation (including ML and API extras) use:
+#   pip install -e ".[all,dev]"
+numpy>=1.24
+opencv-python-headless>=4.8
+scikit-image>=0.21
+scikit-learn>=1.3
+Pillow>=10.0
+typer>=0.9
+rich>=13.0
+streamlit>=1.28
+PyYAML>=6.0
