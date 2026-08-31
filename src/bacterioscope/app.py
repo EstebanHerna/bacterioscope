@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, cast
 
 import cv2
 import numpy as np
@@ -218,7 +218,7 @@ def _run_pipeline(
     pipeline: BacterioScopePipeline, uploaded: Any
 ) -> AnalysisResult | None:
     if "bs_result" in st.session_state:
-        return st.session_state["bs_result"]  # type: ignore[return-value]
+        return cast(AnalysisResult, st.session_state["bs_result"])
     suffix = Path(uploaded.name).suffix.lower() or ".png"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(uploaded.read())
