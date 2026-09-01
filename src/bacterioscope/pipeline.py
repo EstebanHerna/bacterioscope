@@ -129,7 +129,7 @@ class PipelineConfig:
             Change only for non-standard consumables.
     """
     detector_weights: Path = Path("data/models/yolov8_disks.pt")
-    confidence_threshold: float = 0.5
+    confidence_threshold: float = 0.04
     plate_diameter_mm: float = 90.0
     organism_group: str = "Enterobacteriaceae"
     clsi_version: str = "2023"

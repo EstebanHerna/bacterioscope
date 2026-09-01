@@ -162,7 +162,9 @@ class DiskDetector:
         """
         self._load_model()
         if self._model is not None:
-            return self._detect_yolo(image)
+            yolo_results = self._detect_yolo(image)
+            if yolo_results:
+                return yolo_results
         return self._detect_hough(image)
 
     def _detect_yolo(self, image: NDArray[np.uint8]) -> list[DiskResult]:
