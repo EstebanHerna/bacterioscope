@@ -117,18 +117,19 @@ def train(
         ) from exc
 
     model = YOLO(base_model)
+    abs_output = output_dir.resolve()
     model.train(
-        data=str(data_yaml),
+        data=str(data_yaml.resolve()),
         epochs=epochs,
         imgsz=imgsz,
         device=device,
-        project=str(output_dir),
+        project=str(abs_output),
         name="disk_detector",
         exist_ok=True,
     )
 
-    best_pt = output_dir / "disk_detector" / "weights" / "best.pt"
-    dest = output_dir / "yolov8_disks.pt"
+    best_pt = abs_output / "disk_detector" / "weights" / "best.pt"
+    dest = abs_output / "yolov8_disks.pt"
     if best_pt.is_file():
         shutil.copy2(best_pt, dest)
     return dest
