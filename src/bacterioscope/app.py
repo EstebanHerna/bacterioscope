@@ -509,7 +509,7 @@ def _show_results(
     with col_img:
         st.markdown('<div class="bs-sec">Plate</div>', unsafe_allow_html=True)
         display_img = _compose_image(result, vis)
-        st.image(cv2.cvtColor(display_img, cv2.COLOR_BGR2RGB), use_container_width=True)
+        st.image(cv2.cvtColor(display_img, cv2.COLOR_BGR2RGB), width="stretch")
         st.markdown(
             f'<div class="bs-cap">{result.px_per_mm:.2f} px/mm &nbsp;·&nbsp;'
             f" {result.plate_diameter_px:.0f} px plate</div>",
@@ -554,7 +554,7 @@ def main() -> None:
             label_visibility="collapsed",
         )
     with col_ex:
-        use_example = st.button("Use example image", use_container_width=True)
+        use_example = st.button("Use example image", width="stretch")
 
     st.markdown(
         '<div class="bs-upload-hint">'

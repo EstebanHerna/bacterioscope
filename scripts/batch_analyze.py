@@ -15,8 +15,8 @@ Produces two output files in --output-dir:
 
 Usage::
 
-    python scripts/batch_analyze.py --input-dir data/raw/session1 \\
-        --output-dir results/session1 --panel enterobacteria_clsi_12
+    python scripts/batch_analyze.py data/raw/session1 \\
+        --output results/session1 --panel enterobacteria_clsi_12
 """
 
 from __future__ import annotations
@@ -94,8 +94,10 @@ def _process_image(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Batch-analyze Kirby-Bauer plate images.")
-    parser.add_argument("--input-dir", required=True, type=Path)
-    parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("input_dir", type=Path, metavar="INPUT_DIR",
+                        help="Folder containing plate images.")
+    parser.add_argument("--output-dir", "--output", "-o", required=True, type=Path,
+                        dest="output_dir", metavar="OUTPUT_DIR")
     parser.add_argument("--panel", default=None,
                         help="Panel name for automatic antibiotic assignment.")
     parser.add_argument("--organism", default="Enterobacteriaceae")
