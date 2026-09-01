@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 
 from bacterioscope.detection.detector import DiskDetector, DiskResult
+from bacterioscope.detection.label_map import ROBOFLOW_TO_CLSI
 
 
 def _make_detector() -> DiskDetector:
@@ -85,6 +86,37 @@ class TestDiskDetectorHoughMode:
         plate = _make_synthetic_plate()
         for disk in self.detector.detect(plate):
             assert 10 <= disk.radius_px <= 40
+
+
+class TestLabelMap:
+    def test_known_classes_map_to_clsi_keys(self) -> None:
+        assert ROBOFLOW_TO_CLSI["CIP 10"] == "ciprofloxacin"
+        assert ROBOFLOW_TO_CLSI["MEM 10"] == "meropenem"
+        assert ROBOFLOW_TO_CLSI["GEN 10"] == "gentamicin"
+
+    def test_gm_and_gen_both_map_to_gentamicin(self) -> None:
+        assert ROBOFLOW_TO_CLSI["GM 10"] == "gentamicin"
+        assert ROBOFLOW_TO_CLSI["GEN 10"] == "gentamicin"
+
+    def test_ctx_maps_to_ceftriaxone(self) -> None:
+        assert ROBOFLOW_TO_CLSI["CTX 30"] == "ceftriaxone"
+        assert ROBOFLOW_TO_CLSI["CRO 30"] == "ceftriaxone"
+
+    def test_carbapenems_mapped(self) -> None:
+        assert ROBOFLOW_TO_CLSI["IPM 10"] == "imipenem"
+        assert ROBOFLOW_TO_CLSI["MEM 10"] == "meropenem"
+
+    def test_all_values_are_strings(self) -> None:
+        assert all(isinstance(v, str) for v in ROBOFLOW_TO_CLSI.values())
+
+    def test_no_empty_keys_or_values(self) -> None:
+        assert all(k and v for k, v in ROBOFLOW_TO_CLSI.items())
+
+    def test_gram_positive_drug_not_in_map(self) -> None:
+        assert "VA 30" not in ROBOFLOW_TO_CLSI
+
+    def test_missing_key_returns_raw_label(self) -> None:
+        assert ROBOFLOW_TO_CLSI.get("VA 30", "VA 30") == "VA 30"
 
 
 def _make_synthetic_plate(size: int = 540) -> np.ndarray:

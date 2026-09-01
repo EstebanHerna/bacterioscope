@@ -77,9 +77,12 @@ The end-to-end pipeline is fully operational on the Hough + Otsu baseline.
 | REST API (FastAPI, `/health` + `/analyze`) | Complete |
 | Clinical evaluation module (CA, EA, VME, ME, mE — ISO 20776-2) | Complete |
 | Panel configuration (auto angular assignment from YAML, or manual per-disk) | Complete |
-| HTML report export (self-contained, print-to-PDF) | Complete |
-| Batch processing script (`cepa_replica_condicion.jpg` naming, CSV + error log) | Complete |
-| Test suite | 188 tests, all passing |
+| HTML report export (self-contained, 9-section scientific report, print-to-PDF) | Complete |
+| Batch processing script (`cepa_replica_condicion.jpg` naming, CSV + error log, timing summary) | Complete |
+| Design system (Clinical Slate palette, CSS custom properties, dark/light mode) | Complete |
+| Traceability (analysis_id UUID, image SHA-256, commit hash, CLSI edition, stage timings) | Complete |
+| Bland-Altman measurement accuracy analysis (`scripts/validate_measurement.py`) | Complete |
+| Test suite | 236 tests, 93.8% coverage |
 | CI (GitHub Actions) | Green on Python 3.10, 3.11, 3.12 |
 | Static analysis | ruff, mypy strict, bandit, gitleaks |
 
@@ -89,13 +92,13 @@ The end-to-end pipeline is fully operational on the Hough + Otsu baseline.
 
 ## Roadmap
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) for full detail.
+See [docs/ROADMAP.md](docs/ROADMAP.md) for full detail. See [docs/RESUMEN_EVALUADORES.md](docs/RESUMEN_EVALUADORES.md) for the BDIC 2026 evaluator summary (Spanish). See [docs/METODOLOGIA_Y_HERRAMIENTAS.md](docs/METODOLOGIA_Y_HERRAMIENTAS.md) for methodology and tools.
 
 | Phase | Scope | Status |
 |---|---|---|
-| **F0** | End-to-end pipeline, Hough baseline, CLSI classifier, Streamlit demo, CLI, API, evaluation module, panel configuration, HTML reports, batch processing, 188 tests, CI | **Complete** |
+| **F0** | End-to-end pipeline, Hough baseline, CLSI classifier, Streamlit demo, CLI, API, evaluation module, panel configuration, scientific HTML reports, batch processing, design system, traceability, 228 tests, CI | **Complete** |
 | **F1** | Curate and annotate the Dryad/UZH public dataset (225 Gram-negative isolates with clinical ground truth) | Planned |
-| **F2** | Train YOLOv8 to detect each disk and read its printed antibiotic label — eliminates manual assignment | Planned |
+| **F2** | Train YOLOv8 to detect each disk and read its printed antibiotic label — eliminates manual assignment. Roboflow KB-AST dataset ready (102 train images, 29 antibiotic disk classes), label→CLSI mapping complete, GPU training pending. | **In Progress** |
 | **F3** | Calibrate mm measurement using the 6 mm disk as physical reference; validate EA >=90%, CA >=90%, VME <=1.5% | Planned |
 | **F4** | Open-source packaging, public deployable demo, peer-reviewed documentation | Planned |
 
@@ -233,7 +236,7 @@ bacterioscope/
 ├── panels/                  <- YAML panel configs (antibiotics by clockwise position)
 │   ├── enterobacteria_clsi_12.yaml
 │   └── enterobacteria_clsi_6.yaml
-├── tests/                   <- 188 tests, mirrors src/ structure
+├── tests/                   <- 228 tests, mirrors src/ structure
 ├── scripts/
 │   ├── download_data.py        <- Dryad/UZH downloader with manual-step instructions
 │   ├── prepare_dataset.py      <- normalise UZH CSV for validation pipeline

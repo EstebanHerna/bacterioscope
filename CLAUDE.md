@@ -31,9 +31,9 @@ Selected for the Biodiscovery Design Innovation Challenge (BDIC) 2026, Universid
 
 | Phase | Scope | Status |
 |---|---|---|
-| F0 | End-to-end pipeline: Hough disk detection, Otsu+watershed zone segmentation, CLSI M100-Ed33 2023 classifier (15 antibiotics, Enterobacteriaceae), Streamlit demo, CLI, FastAPI, evaluation module (CA/EA/VME/ME/mE ISO 20776-2), 107 tests, CI green on Python 3.10/3.11/3.12 | **Complete** |
+| F0 | End-to-end pipeline: Hough disk detection, Otsu+watershed zone segmentation, CLSI M100-Ed33 2023 classifier (15 antibiotics, Enterobacteriaceae), Streamlit demo, CLI, FastAPI, evaluation module (CA/EA/VME/ME/mE ISO 20776-2), design system (Clinical Slate tokens, dark/light CSS), traceability fields (analysis_id UUID, image SHA-256, commit hash, CLSI edition, stage timings), 9-section scientific HTML plate reports, Bland-Altman measurement validation, panel configuration, batch processing, 228 tests (93.9% coverage), CI green on Python 3.10/3.11/3.12 | **Complete** |
 | F1 | Curate and annotate Dryad/UZH dataset (225 Gram-negative isolates, 862 phenotypic categories, clinical ground truth); produce train/val/test split and ground-truth CSV | Planned |
-| F2 | Train YOLOv8 to detect each disk and read its printed antibiotic label; integrate into detector.py replacing HoughCircles; remove manual selectbox from demo | Planned |
+| F2 | Train YOLOv8 to detect each disk and read its printed antibiotic label; integrate into detector.py replacing HoughCircles; remove manual selectbox from demo. Roboflow KB-AST dataset (102 train / 10 val / 3 test images, 29 classes) annotated and ready. ROBOFLOW_TO_CLSI mapping (14 antibiotic keys) created in detection/label_map.py. Dataset YAML with absolute paths at data/processed/roboflow_dataset.yaml. Training pending GPU torch install. | **In Progress** |
 | F3 | Recalibrate px/mm using 6 mm disk reference; run full clinical validation on held-out test split: EA >=90%, CA >=90%, VME <=1.5%, ME <=3%, mE <=10% | Planned |
 | F4 | PyPI package, Docker image (GHCR), Streamlit Community Cloud deployment, MkDocs documentation site, peer-reviewed write-up | Planned |
 

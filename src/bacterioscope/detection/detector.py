@@ -45,6 +45,8 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from bacterioscope.detection.label_map import ROBOFLOW_TO_CLSI
+
 # SHA-256 hashes of trusted model files. Populate when distributing known-good weights.
 # Loading a .pt file without a matching hash will log a warning; add hashes here to
 # enable enforcement. torch.load (called internally by ultralytics) can execute arbitrary
@@ -173,7 +175,8 @@ class DiskDetector:
                 cx = (x1 + x2) // 2
                 cy = (y1 + y2) // 2
                 radius = max(x2 - x1, y2 - y1) // 2
-                label = r.names[int(box.cls[0])]
+                raw_label = r.names[int(box.cls[0])]
+                label = ROBOFLOW_TO_CLSI.get(raw_label, raw_label)
                 disks.append(DiskResult(
                     label=label,
                     center_x=cx,

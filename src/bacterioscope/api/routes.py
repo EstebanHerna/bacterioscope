@@ -117,6 +117,11 @@ async def analyze(image: UploadFile = File(...)) -> AnalyzeResponse:
         tmp_path.unlink(missing_ok=True)
 
     return AnalyzeResponse(
+        analysis_id=result.analysis_id,
+        software_version=result.software_version,
+        commit_hash=result.commit_hash,
+        breakpoint_table_version=result.breakpoint_table_version,
+        image_sha256=result.image_sha256,
         image_path=result.image_path,
         plate_diameter_px=result.plate_diameter_px,
         px_per_mm=result.px_per_mm,

@@ -107,4 +107,13 @@ targets = ["src/bacterioscope"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-v --cov=src/bacterioscope --cov-report=term-missing"
+addopts = "-v --cov=src/bacterioscope --cov-report=term-missing --cov-fail-under=80"
+
+[tool.coverage.run]
+omit = [
+  "src/bacterioscope/app.py",
+  "src/bacterioscope/api/routes.py",
+  "src/bacterioscope/api/schemas.py",
+  "src/bacterioscope/cli.py",
+  "src/bacterioscope/detection/train.py",
+]

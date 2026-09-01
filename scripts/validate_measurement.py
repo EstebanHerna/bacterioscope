@@ -191,6 +191,98 @@ def _run_image(
     return [p[0] for p in pairs], [p[1] for p in pairs], True
 
 
+def _bland_altman_stats(
+    measured: list[float],
+    reference: list[float],
+) -> dict[str, float]:
+    """Compute Bland-Altman limits of agreement for zone-diameter pairs.
+
+    Args:
+        measured: Pipeline zone diameters in mm.
+        reference: Reference zone diameters in mm.
+
+    Returns:
+        Dict with keys: mean_diff_mm, sd_diff_mm, loa_upper_mm, loa_lower_mm, n_pairs.
+    """
+    m_arr = np.asarray(measured)
+    r_arr = np.asarray(reference)
+    diff = m_arr - r_arr
+    mean_diff = float(np.mean(diff))
+    sd_diff = float(np.std(diff, ddof=1))
+    return {
+        "mean_diff_mm": mean_diff,
+        "sd_diff_mm": sd_diff,
+        "loa_upper_mm": mean_diff + 1.96 * sd_diff,
+        "loa_lower_mm": mean_diff - 1.96 * sd_diff,
+        "n_pairs": float(len(m_arr)),
+    }
+
+
+def _save_scatter_plot(
+    measured: list[float],
+    reference: list[float],
+    output_dir: Path,
+) -> None:
+    """Save a measured vs reference scatter plot (requires matplotlib)."""
+    import matplotlib.pyplot as plt  # noqa: PLC0415
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.scatter(reference, measured, alpha=0.4, s=20)
+    lim = [min(reference + measured) - 2.0, max(reference + measured) + 2.0]
+    ax.plot(lim, lim, "k--", lw=1, label="Identity")
+    ax.set_xlabel("Reference — SIRscan (mm)")
+    ax.set_ylabel("BacterioScope (mm)")
+    ax.set_title("Measured vs Reference Zone Diameters")
+    ax.set_xlim(lim)
+    ax.set_ylim(lim)
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    fig.savefig(output_dir / "scatter_measured_vs_reference.png", dpi=120)
+    plt.close(fig)
+
+
+def _save_bland_altman_plot(
+    measured: list[float],
+    reference: list[float],
+    output_dir: Path,
+) -> None:
+    """Save a Bland-Altman difference plot (requires matplotlib)."""
+    import matplotlib.pyplot as plt  # noqa: PLC0415
+    ba = _bland_altman_stats(measured, reference)
+    m_arr = np.asarray(measured)
+    r_arr = np.asarray(reference)
+    mean_pair = (m_arr + r_arr) / 2.0
+    diff = m_arr - r_arr
+    fig, ax = plt.subplots(figsize=(6, 5))
+    ax.scatter(mean_pair, diff, alpha=0.4, s=20)
+    ax.axhline(ba["mean_diff_mm"], color="k", ls="--", lw=1,
+               label=f"Bias {ba['mean_diff_mm']:.2f} mm")
+    ax.axhline(ba["loa_upper_mm"], color="r", ls=":", lw=1,
+               label=f"+1.96SD {ba['loa_upper_mm']:.2f} mm")
+    ax.axhline(ba["loa_lower_mm"], color="r", ls=":", lw=1,
+               label=f"-1.96SD {ba['loa_lower_mm']:.2f} mm")
+    ax.set_xlabel("Mean of (BacterioScope + Reference) / 2 (mm)")
+    ax.set_ylabel("BacterioScope − Reference (mm)")
+    ax.set_title("Bland-Altman Plot")
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    fig.savefig(output_dir / "bland_altman.png", dpi=120)
+    plt.close(fig)
+
+
+def _try_save_plots(
+    measured: list[float],
+    reference: list[float],
+    output_dir: Path,
+) -> None:
+    """Attempt to save scatter and Bland-Altman plots; skip gracefully if matplotlib absent."""
+    try:
+        _save_scatter_plot(measured, reference, output_dir)
+        _save_bland_altman_plot(measured, reference, output_dir)
+        log.info("Plots saved to %s", output_dir)
+    except ImportError:
+        log.info("matplotlib not installed — skipping plot generation.")
+
+
 def _write_failure_log(log_path: Path, failures: list[str]) -> None:
     """Write the list of failed/mismatched image names to a log file."""
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -206,6 +298,7 @@ def _write_report(
     ea: float,
     mae: float,
     pearson_r: float,
+    ba: dict[str, float] | None = None,
 ) -> None:
     """Write the Markdown validation report, replacing all pending placeholders."""
     lines = [
@@ -255,6 +348,24 @@ def _write_report(
         f"| Mean Absolute Error (MAE) | **{mae:.2f} mm** | — | mm |",
         f"| Pearson r | **{pearson_r:.3f}** | — | — |",
         "",
+        "### Bland-Altman limits of agreement",
+        "",
+    ]
+    if ba:
+        lines += [
+            "| Stat | Value |",
+            "|---|---|",
+            f"| Bias (mean diff) | {ba['mean_diff_mm']:+.2f} mm |",
+            f"| SD of differences | {ba['sd_diff_mm']:.2f} mm |",
+            f"| Upper LoA (+1.96 SD) | {ba['loa_upper_mm']:+.2f} mm |",
+            f"| Lower LoA (−1.96 SD) | {ba['loa_lower_mm']:+.2f} mm |",
+            f"| Pairs analysed | {int(ba['n_pairs'])} |",
+            "",
+        ]
+    else:
+        lines.append("Insufficient data for Bland-Altman analysis.")
+        lines.append("")
+    lines += [
         "### Definition of Essential Agreement used here",
         "",
         "Classical EA (ISO 20776-2) is defined for MIC broth microdilution: "
@@ -373,19 +484,28 @@ def main() -> None:
 
     if len(all_measured) < 2:
         log.error("Not enough matched pairs to compute metrics (got %d).", len(all_measured))
+        log.error(
+            "Ensure the dataset is prepared: python scripts/prepare_dataset.py"
+        )
         sys.exit(1)
 
     meas_arr = np.asarray(all_measured)
     ref_arr = np.asarray(all_reference)
     ea = float(np.mean(np.abs(meas_arr - ref_arr) <= _EA_MARGIN_MM))
-    stats = zone_diameter_stats(all_measured, all_reference)
-    mae = stats["mae_mm"]
-    r = stats["pearson_r"]
+    diam_stats = zone_diameter_stats(all_measured, all_reference)
+    mae = diam_stats["mae_mm"]
+    r = diam_stats["pearson_r"]
+    ba = _bland_altman_stats(all_measured, all_reference)
 
     log.info("EA (+-2 mm): %.1f%%", ea * 100)
     log.info("MAE: %.2f mm", mae)
     log.info("Pearson r: %.3f", r)
+    log.info(
+        "Bland-Altman: bias=%.2f mm  LoA [%.2f, %.2f]",
+        ba["mean_diff_mm"], ba["loa_lower_mm"], ba["loa_upper_mm"],
+    )
 
+    _try_save_plots(all_measured, all_reference, args.output)
     _write_report(
         args.report,
         n_images_total=len(filenames),
@@ -395,6 +515,7 @@ def main() -> None:
         ea=ea,
         mae=mae,
         pearson_r=r,
+        ba=ba,
     )
     log.info("Report written: %s", args.report)
 

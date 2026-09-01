@@ -80,6 +80,12 @@ CLSI_2023_ENTEROBACTERIACEAE: dict[str, dict[str, float]] = {
     "trimethoprim-sulfamethoxazole": {"S": 16.0, "I_low": 11.0, "I_high": 15.0, "R": 10.0},
 }
 
+BREAKPOINT_TABLE_VERSION: str = "CLSI M100-Ed33 2023"
+
+LAST_LINE_ANTIBIOTICS: frozenset[str] = frozenset(
+    {"meropenem", "imipenem", "ertapenem", "doripenem"}
+)
+
 BREAKPOINT_TABLES: dict[str, dict[str, dict[str, float]]] = {
     "Enterobacteriaceae": CLSI_2023_ENTEROBACTERIACEAE,
 }

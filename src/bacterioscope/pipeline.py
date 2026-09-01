@@ -44,7 +44,11 @@ this pipeline directly.
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import subprocess
+import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -52,7 +56,11 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from bacterioscope.classification.clsi import CLSIClassifier, SusceptibilityResult
+from bacterioscope.classification.clsi import (
+    BREAKPOINT_TABLE_VERSION,
+    CLSIClassifier,
+    SusceptibilityResult,
+)
 from bacterioscope.detection.detector import DiskDetector, DiskResult
 from bacterioscope.segmentation.watershed import ZoneResult, ZoneSegmenter
 from bacterioscope.utils.calibration import calibrate_from_disk_radius_px, calibrate_px_per_mm
@@ -60,6 +68,33 @@ from bacterioscope.utils.image import load_image
 from bacterioscope.utils.visualization import draw_results
 
 log = logging.getLogger(__name__)
+
+_SOFTWARE_VERSION: str = "0.1.0"
+
+
+def _get_commit_hash() -> str:
+    """Return the current git short hash, or 'unknown' if git is unavailable."""
+    try:
+        proc = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if proc.returncode == 0:
+            return proc.stdout.strip()
+    except Exception:
+        pass
+    return "unknown"
+
+
+def _compute_image_sha256(image_path: Path) -> str:
+    """Return the SHA-256 hex digest of a file."""
+    h = hashlib.sha256()
+    with image_path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 @dataclass
@@ -141,6 +176,12 @@ class AnalysisResult:
     original_image: NDArray[np.uint8] | None = None
     flags: list[list[str]] = field(default_factory=list)
     plate_center: tuple[int, int] = field(default_factory=lambda: (0, 0))
+    analysis_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    software_version: str = ""
+    commit_hash: str = "unknown"
+    breakpoint_table_version: str = ""
+    image_sha256: str = ""
+    timings_ms: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise the analysis result to a JSON-compatible dictionary.
@@ -151,6 +192,12 @@ class AnalysisResult:
             name, zone diameter, classification, breakpoints, and flags).
         """
         return {
+            "analysis_id": self.analysis_id,
+            "software_version": self.software_version,
+            "commit_hash": self.commit_hash,
+            "breakpoint_table_version": self.breakpoint_table_version,
+            "image_sha256": self.image_sha256,
+            "timings_ms": {k: round(v, 1) for k, v in self.timings_ms.items()},
             "image_path": self.image_path,
             "plate_diameter_px": round(self.plate_diameter_px, 1),
             "px_per_mm": round(self.px_per_mm, 3),
@@ -247,11 +294,16 @@ class BacterioScopePipeline:
             ValueError: If the file format is unsupported, exceeds 50 MB,
                 or cannot be decoded by OpenCV.
         """
+        t0 = time.perf_counter()
         image_path = Path(image_path)
         image = load_image(image_path)
+        t_load = time.perf_counter()
 
         plate_diameter_px, px_per_mm = calibrate_px_per_mm(image, self.config.plate_diameter_mm)
+        t_cal = time.perf_counter()
+
         disks = self.detector.detect(image)
+        t_det = time.perf_counter()
 
         if self.config.use_disk_calibration and disks:
             median_radius = float(np.median([d.radius_px for d in disks]))
@@ -259,10 +311,33 @@ class BacterioScopePipeline:
 
         original = image.copy()
         zones = self._segment_all(image, disks, px_per_mm)
+        t_seg = time.perf_counter()
+
         classifications = self._classify_all(disks, zones)
         flags = self._compute_flags(disks, zones, image.shape)
+        t_cls = time.perf_counter()
+
         annotated = draw_results(image.copy(), disks, zones, classifications, flags)
         plate_center = _estimate_plate_center(disks, image.shape)
+        t_end = time.perf_counter()
+
+        def _ms(a: float, b: float) -> float:
+            return round((b - a) * 1000.0, 1)
+
+        timings: dict[str, float] = {
+            "load_ms": _ms(t0, t_load),
+            "calibrate_ms": _ms(t_load, t_cal),
+            "detect_ms": _ms(t_cal, t_det),
+            "segment_ms": _ms(t_det, t_seg),
+            "classify_ms": _ms(t_seg, t_cls),
+            "annotate_ms": _ms(t_cls, t_end),
+            "total_ms": _ms(t0, t_end),
+        }
+        log.debug(
+            "analyze timing: %s  disks=%d",
+            " ".join(f"{k}={v}" for k, v in timings.items()),
+            len(disks),
+        )
 
         return AnalysisResult(
             image_path=str(image_path),
@@ -275,6 +350,11 @@ class BacterioScopePipeline:
             original_image=original,
             flags=flags,
             plate_center=plate_center,
+            software_version=_SOFTWARE_VERSION,
+            commit_hash=_get_commit_hash(),
+            breakpoint_table_version=BREAKPOINT_TABLE_VERSION,
+            image_sha256=_compute_image_sha256(image_path),
+            timings_ms=timings,
         )
 
     def _segment_all(

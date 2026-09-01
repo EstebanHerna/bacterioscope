@@ -6,9 +6,12 @@ import io
 
 import cv2
 import numpy as np
-from fastapi.testclient import TestClient
+import pytest
 
-from bacterioscope.api.routes import app
+fastapi = pytest.importorskip("fastapi", reason="fastapi not installed")
+from fastapi.testclient import TestClient  # noqa: E402
+
+from bacterioscope.api.routes import app  # noqa: E402
 
 client = TestClient(app, raise_server_exceptions=False)
 

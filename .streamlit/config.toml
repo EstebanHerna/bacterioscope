@@ -1,9 +1,11 @@
+# Colors sourced from design/tokens.py — Clinical Slate dark palette.
+# bg_base=#0E1418  bg_surface=#161D22  text_primary=#E8EDEF  cat_susceptible=#3E8E6B
 [theme]
 base = "dark"
-primaryColor = "#4d9e6a"
-backgroundColor = "#0f0f0f"
-secondaryBackgroundColor = "#171717"
-textColor = "#e8e8e8"
+primaryColor = "#3E8E6B"
+backgroundColor = "#0E1418"
+secondaryBackgroundColor = "#161D22"
+textColor = "#E8EDEF"
 font = "sans serif"
 
 [server]

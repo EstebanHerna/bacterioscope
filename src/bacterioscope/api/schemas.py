@@ -44,6 +44,13 @@ class DiskAnalysisItem(BaseModel):
 class AnalyzeResponse(BaseModel):
     """Full analysis result for one antibiogram plate image."""
 
+    analysis_id: str = Field(description="UUID that uniquely identifies this analysis run.")
+    software_version: str = Field(description="BacterioScope version that produced this result.")
+    commit_hash: str = Field(
+        description="Git short hash of the running code ('unknown' in packaged builds)."
+    )
+    breakpoint_table_version: str = Field(description="CLSI edition used for classification.")
+    image_sha256: str = Field(description="SHA-256 hex digest of the input image file.")
     image_path: str = Field(description="Path or name of the analyzed image.")
     plate_diameter_px: float = Field(ge=0.0, description="Detected plate diameter in pixels.")
     px_per_mm: float = Field(gt=0.0, description="Calibration factor: pixels per millimetre.")

@@ -29,142 +29,103 @@ from bacterioscope.utils.visualization import draw_results
 _EXAMPLE_IMAGE = Path(__file__).parent.parent.parent / "docs" / "plate_original.png"
 
 # ---------------------------------------------------------------------------
-# Design tokens — single source of truth for CSS variables
+# Design tokens — CSS sourced from bacterioscope.design.tokens
 # ---------------------------------------------------------------------------
-_CSS = """
-<style>
-:root {
-  --bg:      #0f0f0f;
-  --surf:    #171717;
-  --border:  #252525;
-  --text:    #e0e0e0;
-  --text2:   #6a6a6a;
-  --text3:   #333333;
-  --s:       #4d9e6a;
-  --i:       #c48a2e;
-  --r:       #b54040;
-  --flag:    #a07830;
-}
 
-.main .block-container { padding-top: 1.2rem; padding-bottom: 2rem; max-width: 1280px; }
+_COMPONENT_CSS = (
+    ".main .block-container{padding-top:1.2rem;padding-bottom:2rem;max-width:1280px}"
+    ".bs-h1{font-size:1.35rem;font-weight:700;letter-spacing:-.025em;"
+    "color:var(--bs-text-primary)}"
+    ".bs-sub{font-size:.74rem;color:var(--bs-text-secondary);margin-top:3px}"
+    ".bs-sec{font-size:.60rem;font-weight:600;text-transform:uppercase;"
+    "letter-spacing:.10em;color:var(--bs-text-secondary);margin-bottom:9px}"
+    ".bs-mode{padding:9px 11px;border:1px solid var(--bs-border);"
+    "border-left:2px solid var(--bs-border);border-radius:4px;margin-bottom:12px}"
+    ".bs-mode--ok{border-left-color:var(--bs-cat-susceptible)}"
+    ".bs-mode--geo{border-left-color:var(--bs-cat-intermediate)}"
+    ".mode-title{font-size:.75rem;font-weight:600;color:var(--bs-text-primary)}"
+    ".mode-desc{font-size:.70rem;color:var(--bs-text-secondary);"
+    "margin-top:2px;line-height:1.5}"
+    ".bs-metrics{display:flex;gap:6px;margin-bottom:13px}"
+    ".bs-metric{flex:1;padding:11px 10px;border:1px solid var(--bs-border);"
+    "border-radius:4px;background:var(--bs-bg-surface)}"
+    ".m-n{font-size:2rem;font-weight:700;letter-spacing:-.02em;"
+    "font-variant-numeric:tabular-nums;line-height:1}"
+    ".bs-metric--s .m-n{color:var(--bs-cat-susceptible)}"
+    ".bs-metric--i .m-n{color:var(--bs-cat-intermediate)}"
+    ".bs-metric--r .m-n{color:var(--bs-cat-resistant)}"
+    ".m-lbl{font-size:.60rem;font-weight:600;text-transform:uppercase;"
+    "letter-spacing:.08em;color:var(--bs-text-secondary);margin-top:5px}"
+    ".bs-table{width:100%;border-collapse:collapse;font-size:.81rem}"
+    ".bs-table thead tr{border-bottom:1px solid var(--bs-border)}"
+    ".bs-table th{text-align:left;padding:0 10px 8px;font-size:.60rem;"
+    "font-weight:600;text-transform:uppercase;letter-spacing:.09em;"
+    "color:var(--bs-text-secondary)}"
+    ".bs-table th:last-child{text-align:right}"
+    ".bs-table tbody tr{border-bottom:1px solid var(--bs-border)}"
+    ".bs-table td{padding:8px 10px;vertical-align:middle}"
+    ".col-name{color:var(--bs-text-primary);font-weight:500}"
+    ".col-diam{color:var(--bs-text-secondary);font-variant-numeric:tabular-nums}"
+    ".col-cat{text-align:right}"
+    ".bs-badge{display:inline-block;padding:2px 7px;border-radius:3px;"
+    "font-size:.67rem;font-weight:600;letter-spacing:.04em}"
+    ".bs-badge--s{color:var(--bs-cat-susceptible);"
+    "background:color-mix(in srgb,var(--bs-cat-susceptible) 12%,transparent)}"
+    ".bs-badge--i{color:var(--bs-cat-intermediate);"
+    "background:color-mix(in srgb,var(--bs-cat-intermediate) 12%,transparent)}"
+    ".bs-badge--r{color:var(--bs-cat-resistant);"
+    "background:color-mix(in srgb,var(--bs-cat-resistant) 12%,transparent)}"
+    ".bs-badge--unknown{color:var(--bs-text-secondary);"
+    "background:color-mix(in srgb,var(--bs-text-secondary) 20%,transparent)}"
+    ".bs-badge--manual,.bs-badge--flag{color:var(--bs-quality-warning);"
+    "background:color-mix(in srgb,var(--bs-quality-warning) 12%,transparent);"
+    "font-size:.58rem;margin-left:4px}"
+    ".bs-cap{font-size:.68rem;color:var(--bs-text-secondary);margin-top:5px;"
+    "font-variant-numeric:tabular-nums}"
+    ".bs-hr{border:none;border-top:1px solid var(--bs-border);margin:11px 0}"
+    ".bs-sb-brand{font-size:.88rem;font-weight:700;letter-spacing:-.01em;"
+    "color:var(--bs-text-primary);padding-bottom:13px;margin-bottom:13px;"
+    "border-bottom:1px solid var(--bs-border)}"
+    ".bs-sb-v{font-size:.63rem;font-weight:400;color:var(--bs-text-secondary);"
+    "margin-left:4px}"
+    ".bs-sb-sec{font-size:.60rem;font-weight:600;text-transform:uppercase;"
+    "letter-spacing:.09em;color:var(--bs-text-secondary);margin-bottom:9px}"
+    ".bs-sb-hr{border:none;border-top:1px solid var(--bs-border);margin:13px 0}"
+    ".bs-sb-refs{font-size:.68rem;color:var(--bs-text-secondary);line-height:1.85}"
+    ".bs-welcome{display:flex;flex-direction:column;align-items:center;"
+    "text-align:center;padding:60px 20px;color:var(--bs-text-secondary)}"
+    ".w-title{font-size:.85rem;font-weight:500;color:var(--bs-text-secondary);"
+    "margin-bottom:5px}"
+    ".w-desc{font-size:.73rem;line-height:1.7;max-width:310px}"
+    ".bs-upload-hint{font-size:.69rem;color:var(--bs-text-secondary);margin-top:4px}"
+    ".bs-th{font-size:.60rem;font-weight:600;text-transform:uppercase;"
+    "letter-spacing:.09em;color:var(--bs-text-secondary);padding-bottom:7px}"
+    ".bs-td{padding-top:7px;font-size:.80rem;color:var(--bs-text-secondary);"
+    "font-variant-numeric:tabular-nums}"
+    ".bs-td-name{padding-top:7px;font-size:.80rem;color:var(--bs-text-primary)}"
+    ".bs-td-badge{padding-top:7px;text-align:right}"
+)
 
-/* Header */
-.bs-h1 { font-size:1.35rem; font-weight:700; letter-spacing:-.025em; color:var(--text); }
-.bs-sub { font-size:.74rem; color:var(--text2); margin-top:3px; }
 
-/* Section label */
-.bs-sec {
-  font-size:.60rem; font-weight:600; text-transform:uppercase;
-  letter-spacing:.10em; color:var(--text3); margin-bottom:9px;
-}
+def _token_vars() -> str:
+    from bacterioscope.design.tokens import FONT_STACK_MONO, FONT_STACK_SANS, palette
 
-/* Mode indicator */
-.bs-mode {
-  padding:9px 11px; border:1px solid var(--border);
-  border-left:2px solid var(--text3); border-radius:4px; margin-bottom:12px;
-}
-.bs-mode--ok  { border-left-color:var(--s); }
-.bs-mode--geo { border-left-color:var(--i); }
-.mode-title { font-size:.75rem; font-weight:600; color:var(--text); }
-.mode-desc  { font-size:.70rem; color:var(--text2); margin-top:2px; line-height:1.5; }
+    def _props(p: dict[str, str]) -> str:
+        return "".join(f"--bs-{k.replace('_','-')}:{v};" for k, v in p.items())
 
-/* Metric cards */
-.bs-metrics { display:flex; gap:6px; margin-bottom:13px; }
-.bs-metric {
-  flex:1; padding:11px 10px; border:1px solid var(--border);
-  border-radius:4px; background:var(--surf);
-}
-.m-n { font-size:2rem; font-weight:700; letter-spacing:-.02em;
-        font-variant-numeric:tabular-nums; line-height:1; }
-.bs-metric--s .m-n { color:var(--s); }
-.bs-metric--i .m-n { color:var(--i); }
-.bs-metric--r .m-n { color:var(--r); }
-.m-lbl { font-size:.60rem; font-weight:600; text-transform:uppercase;
-          letter-spacing:.08em; color:var(--text3); margin-top:5px; }
+    lv = _props(palette("light"))
+    dv = _props(palette("dark"))
+    fonts = f"--bs-font-sans:{FONT_STACK_SANS};--bs-font-mono:{FONT_STACK_MONO};"
+    return (
+        f":root{{{lv}{fonts}}}"
+        f"@media(prefers-color-scheme:dark)"
+        f"{{:root:not([data-theme=light]){{{dv}}}}}"
+        f"[data-theme=dark]{{{dv}}}"
+    )
 
-/* Table */
-.bs-table { width:100%; border-collapse:collapse; font-size:.81rem; }
-.bs-table thead tr { border-bottom:1px solid var(--border); }
-.bs-table th {
-  text-align:left; padding:0 10px 8px;
-  font-size:.60rem; font-weight:600; text-transform:uppercase;
-  letter-spacing:.09em; color:var(--text3);
-}
-.bs-table th:last-child { text-align:right; }
-.bs-table tbody tr { border-bottom:1px solid var(--border); }
-.bs-table td { padding:8px 10px; vertical-align:middle; }
-.col-name { color:var(--text); font-weight:500; }
-.col-diam { color:var(--text2); font-variant-numeric:tabular-nums; }
-.col-cat  { text-align:right; }
 
-/* Badges */
-.bs-badge {
-  display:inline-block; padding:2px 7px; border-radius:3px;
-  font-size:.67rem; font-weight:600; letter-spacing:.04em;
-}
-.bs-badge--s       { background:rgba(77,158,106,.10); color:var(--s); }
-.bs-badge--i       { background:rgba(196,138,46,.10); color:var(--i); }
-.bs-badge--r       { background:rgba(181,64,64,.10);  color:var(--r); }
-.bs-badge--unknown { background:rgba(100,100,100,.10); color:var(--text2); }
-.bs-badge--manual  { background:rgba(160,120,48,.08); color:var(--flag);
-                     font-size:.58rem; margin-left:4px; }
-.bs-badge--flag    { background:rgba(160,120,48,.08); color:var(--flag);
-                     font-size:.58rem; margin-left:4px; }
-
-/* Caption / helper */
-.bs-cap { font-size:.68rem; color:var(--text3); margin-top:5px;
-          font-variant-numeric:tabular-nums; }
-
-/* Divider */
-.bs-hr { border:none; border-top:1px solid var(--border); margin:11px 0; }
-
-/* Sidebar */
-.bs-sb-brand {
-  font-size:.88rem; font-weight:700; letter-spacing:-.01em;
-  color:var(--text); padding-bottom:13px; margin-bottom:13px;
-  border-bottom:1px solid var(--border);
-}
-.bs-sb-v { font-size:.63rem; font-weight:400; color:var(--text3); margin-left:4px; }
-.bs-sb-sec {
-  font-size:.60rem; font-weight:600; text-transform:uppercase;
-  letter-spacing:.09em; color:var(--text3); margin-bottom:9px;
-}
-.bs-sb-hr { border:none; border-top:1px solid var(--border); margin:13px 0; }
-.bs-sb-refs { font-size:.68rem; color:var(--text3); line-height:1.85; }
-
-/* Welcome */
-.bs-welcome {
-  display:flex; flex-direction:column; align-items:center;
-  text-align:center; padding:60px 20px; color:var(--text3);
-}
-.w-title { font-size:.85rem; font-weight:500; color:var(--text2); margin-bottom:5px; }
-.w-desc  { font-size:.73rem; line-height:1.7; max-width:310px; }
-
-/* Upload hint */
-.bs-upload-hint { font-size:.69rem; color:var(--text3); margin-top:4px; }
-
-/* Hough table */
-.bs-th {
-  font-size:.60rem; font-weight:600; text-transform:uppercase;
-  letter-spacing:.09em; color:var(--text3); padding-bottom:7px;
-}
-.bs-td { padding-top:7px; font-size:.80rem; color:var(--text2);
-          font-variant-numeric:tabular-nums; }
-.bs-td-name { padding-top:7px; font-size:.80rem; color:var(--text); }
-.bs-td-badge { padding-top:7px; text-align:right; }
-
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg:     #f7f7f5;
-    --surf:   #ffffff;
-    --border: #e0e0e0;
-    --text:   #111111;
-    --text2:  #666666;
-    --text3:  #aaaaaa;
-  }
-}
-</style>
-"""
+def _build_css() -> str:
+    return f"<style>{_token_vars()}{_COMPONENT_CSS}</style>"
 
 # ---------------------------------------------------------------------------
 # Stroke-colour presets — None means use category colour
@@ -536,7 +497,7 @@ def main() -> None:
     st.set_page_config(
         page_title="BacterioScope", layout="wide", initial_sidebar_state="expanded"
     )
-    st.markdown(_CSS, unsafe_allow_html=True)
+    st.markdown(_build_css(), unsafe_allow_html=True)
     st.markdown(
         '<div class="bs-h1">BacterioScope</div>'
         '<div class="bs-sub">Kirby-Bauer analysis — CLSI M100-Ed33 (2023)</div>',

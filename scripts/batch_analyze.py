@@ -26,6 +26,7 @@ import csv
 import logging
 import re
 import sys
+import time
 from pathlib import Path
 
 _SUPPORTED = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"}
@@ -79,6 +80,10 @@ def _process_image(
     for i, cls in enumerate(result.classifications):
         flags = result.flags[i] if i < len(result.flags) else []
         rows.append({
+            "analysis_id": result.analysis_id,
+            "software_version": result.software_version,
+            "breakpoint_table_version": result.breakpoint_table_version,
+            "image_sha256": result.image_sha256,
             "filename": image_path.name,
             "cepa": meta["cepa"],
             "replica": meta["replica"],
@@ -126,20 +131,35 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     all_rows: list[dict[str, str]] = []
+    timings_ms: list[float] = []
+    disk_counts: list[int] = []
     errors = 0
     for img_path in images:
+        t0 = time.perf_counter()
         try:
             rows = _process_image(img_path, pl, panel_labels)
+            elapsed = (time.perf_counter() - t0) * 1000.0
             all_rows.extend(rows)
-            print(f"  ok  {img_path.name} ({len(rows)} disks)")
+            timings_ms.append(elapsed)
+            disk_counts.append(len(rows))
+            print(f"  ok  {img_path.name} ({len(rows)} disks, {elapsed:.0f} ms)")
         except Exception as exc:
             log.warning("FAILED %s: %s", img_path.name, exc)
             print(f" ERR  {img_path.name}: {exc}", file=sys.stderr)
             errors += 1
 
     csv_path = _write_csv(all_rows, args.output_dir)
+    n_ok = len(images) - errors
     print(f"\nResults written to {csv_path}")
-    print(f"Processed: {len(images) - errors}/{len(images)} images, {errors} failed.")
+    print(f"Processed: {n_ok}/{len(images)} images, {errors} failed.")
+    if timings_ms:
+        mean_ms = sum(timings_ms) / len(timings_ms)
+        avg_disks = sum(disk_counts) / len(disk_counts)
+        print(
+            f"Timing: mean {mean_ms:.0f} ms/image, "
+            f"min {min(timings_ms):.0f} ms, max {max(timings_ms):.0f} ms. "
+            f"Avg disks/image: {avg_disks:.1f}."
+        )
     if errors:
         print(f"Errors logged to {args.output_dir / 'errors.log'}")
     return 0 if errors == 0 else 1
