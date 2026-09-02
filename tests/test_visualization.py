@@ -8,7 +8,7 @@ import numpy as np
 from bacterioscope.classification.clsi import SusceptibilityResult
 from bacterioscope.detection.detector import DiskResult
 from bacterioscope.segmentation.watershed import ZoneResult
-from bacterioscope.utils.visualization import draw_results
+from bacterioscope.utils.visualization import draw_results, has_watermark
 
 
 def _make_disk(cx: int = 100, cy: int = 100, r: int = 15) -> DiskResult:
@@ -101,3 +101,26 @@ class TestDrawResultsFlags:
         draw_results(img_none, [_make_disk()], [_make_zone()], [_make_cls()], flags=None)
         draw_results(img_empty, [_make_disk()], [_make_zone()], [_make_cls()], flags=[[]])
         assert np.array_equal(img_none, img_empty)
+
+
+class TestWatermark:
+    def test_draw_results_stamps_watermark(self) -> None:
+        img = np.zeros((300, 300, 3), dtype=np.uint8)
+        draw_results(img, [_make_disk()], [_make_zone()], [_make_cls()])
+        assert has_watermark(img)
+
+    def test_fresh_image_has_no_watermark(self) -> None:
+        img = np.full((300, 300, 3), 148, dtype=np.uint8)
+        assert not has_watermark(img)
+
+    def test_watermark_survives_jpeg_recompression(self) -> None:
+        img = np.zeros((300, 300, 3), dtype=np.uint8)
+        draw_results(img, [_make_disk()], [_make_zone()], [_make_cls()])
+        ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 90])
+        assert ok
+        recompressed = cv2.imdecode(buf, cv2.IMREAD_COLOR)
+        assert has_watermark(recompressed)
+
+    def test_tiny_image_does_not_crash(self) -> None:
+        img = np.zeros((3, 3, 3), dtype=np.uint8)
+        assert has_watermark(img) in (True, False)

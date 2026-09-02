@@ -64,8 +64,8 @@ from bacterioscope.classification.clsi import (
 from bacterioscope.detection.detector import DiskDetector, DiskResult
 from bacterioscope.segmentation.watershed import ZoneResult, ZoneSegmenter
 from bacterioscope.utils.calibration import calibrate_from_disk_radius_px, calibrate_px_per_mm
-from bacterioscope.utils.image import load_image
-from bacterioscope.utils.visualization import draw_results
+from bacterioscope.utils.image import load_image, resize_canonical
+from bacterioscope.utils.visualization import draw_results, has_watermark
 
 log = logging.getLogger(__name__)
 
@@ -111,8 +111,14 @@ class PipelineConfig:
             falls back to Hough circle detection automatically.
         confidence_threshold: Minimum YOLOv8 confidence score in [0.0, 1.0].
             Detections below this value are discarded.  Does not affect Hough
-            mode.  Lower values detect more disks but may introduce false
-            positives.
+            mode.  Kept at a defensible floor (0.25): the 29-class detector's
+            maximum observed confidence on real photos is ~0.05, so anything
+            it reports above that is model noise, not a real detection --
+            and because the hybrid fallback only tries Hough when YOLO finds
+            nothing, a single noisy YOLO detection can silently pre-empt 16
+            reliable Hough detections (see docs/VALIDATION_REPORT.md). Do not
+            lower this to force detections out of an undertrained model; use
+            Hough (the current default fallback) or train a better model.
         plate_diameter_mm: Physical diameter of the Petri dish in mm.
             Used to compute the pixel-to-mm calibration ratio.
             Standard Mueller-Hinton plates: 90 mm.
@@ -126,16 +132,27 @@ class PipelineConfig:
             detection.  More robust under variable lighting.  Defaults to
             ``False`` for backwards compatibility.
         disk_diameter_mm: Physical diameter of a standard antibiotic disk in
-            mm.  Used only when ``use_disk_calibration`` is ``True``.
-            Change only for non-standard consumables.
+            mm.  Used when ``use_disk_calibration`` is ``True``, and always
+            used to derive the calibrated Hough disk-search radius (see
+            ``detector.py``).
+        canonical_resize_enabled: If ``True`` (default), downscale the image
+            so its longer side is at most ``canonical_max_dimension`` before
+            calibration and detection.  Never upscales, so small synthetic
+            test plates are unaffected.  Brings phone photos (up to ~4128 px)
+            and dataset images (640-1024 px) into a shared pixel-scale
+            ballpark so one geometry parameter set works across cameras.
+        canonical_max_dimension: Longer-side target in pixels for the
+            canonical resize.  Only used when ``canonical_resize_enabled``.
     """
     detector_weights: Path = Path("data/models/yolov8_disks.pt")
-    confidence_threshold: float = 0.04
+    confidence_threshold: float = 0.25
     plate_diameter_mm: float = 90.0
     organism_group: str = "Enterobacteriaceae"
     clsi_version: str = "2023"
     use_disk_calibration: bool = False
     disk_diameter_mm: float = 6.0
+    canonical_resize_enabled: bool = True
+    canonical_max_dimension: int = 1400
 
 
 @dataclass
@@ -166,6 +183,17 @@ class AnalysisResult:
             Computed as the centroid of detected disks, or the image centre
             when no disks are found.  Used by PanelManager for angular
             disk-position assignment.
+        canonical_scale_factor: Ratio applied by the canonical resize step
+            (resized_side / original_side).  ``1.0`` when the input was
+            already at or below ``canonical_max_dimension``, or resizing was
+            disabled.  All pixel/mm fields on this result are expressed in
+            the (possibly resized) canonical image space.
+        disk_calibration_ratio: Median detected disk diameter (mm) divided
+            by the expected physical disk diameter (normally 6.0). ``1.0``
+            means calibration and disk-radius estimation agree with the
+            known physical disk size; ``None`` when no disks were detected.
+            A value that deviates consistently from 1.0 across many images
+            signals a systematic calibration or detection-radius bias.
     """
     image_path: str
     plate_diameter_px: float
@@ -183,6 +211,8 @@ class AnalysisResult:
     breakpoint_table_version: str = ""
     image_sha256: str = ""
     timings_ms: dict[str, float] = field(default_factory=dict)
+    canonical_scale_factor: float = 1.0
+    disk_calibration_ratio: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise the analysis result to a JSON-compatible dictionary.
@@ -202,6 +232,12 @@ class AnalysisResult:
             "image_path": self.image_path,
             "plate_diameter_px": round(self.plate_diameter_px, 1),
             "px_per_mm": round(self.px_per_mm, 3),
+            "canonical_scale_factor": round(self.canonical_scale_factor, 4),
+            "disk_calibration_ratio": (
+                round(self.disk_calibration_ratio, 3)
+                if self.disk_calibration_ratio is not None
+                else None
+            ),
             "results": [
                 {
                     "antibiotic": cls.antibiotic,
@@ -261,6 +297,7 @@ class BacterioScopePipeline:
         self.detector = DiskDetector(
             weights=self.config.detector_weights,
             confidence=self.config.confidence_threshold,
+            disk_diameter_mm=self.config.disk_diameter_mm,
         )
         self.segmenter = ZoneSegmenter()
         self.classifier = CLSIClassifier(
@@ -298,17 +335,29 @@ class BacterioScopePipeline:
         t0 = time.perf_counter()
         image_path = Path(image_path)
         image = load_image(image_path)
+        if has_watermark(image):
+            raise ValueError(
+                f"{image_path.name} already carries a BacterioScope output watermark "
+                "(top-left corner marker) -- it looks like an annotated result, not a "
+                "raw photograph. Upload the original, unprocessed image instead."
+            )
+        if self.config.canonical_resize_enabled:
+            image, scale_factor = resize_canonical(image, self.config.canonical_max_dimension)
+        else:
+            scale_factor = 1.0
         t_load = time.perf_counter()
 
         plate_diameter_px, px_per_mm = calibrate_px_per_mm(image, self.config.plate_diameter_mm)
         t_cal = time.perf_counter()
 
-        disks = self.detector.detect(image)
+        disks = self.detector.detect(image, px_per_mm=px_per_mm)
         t_det = time.perf_counter()
 
         if self.config.use_disk_calibration and disks:
             median_radius = float(np.median([d.radius_px for d in disks]))
             px_per_mm = calibrate_from_disk_radius_px(median_radius, self.config.disk_diameter_mm)
+
+        disk_calibration_ratio = self._disk_calibration_ratio(disks, px_per_mm)
 
         original = image.copy()
         zones = self._segment_all(image, disks, px_per_mm)
@@ -356,7 +405,32 @@ class BacterioScopePipeline:
             breakpoint_table_version=BREAKPOINT_TABLE_VERSION,
             image_sha256=_compute_image_sha256(image_path),
             timings_ms=timings,
+            canonical_scale_factor=scale_factor,
+            disk_calibration_ratio=disk_calibration_ratio,
         )
+
+    def _disk_calibration_ratio(
+        self,
+        disks: list[DiskResult],
+        px_per_mm: float,
+    ) -> float | None:
+        """Compare median detected disk size against the known physical size.
+
+        A diagnostic signal, not used to correct measurements automatically.
+        See ``AnalysisResult.disk_calibration_ratio`` for interpretation.
+
+        Args:
+            disks: Detected disks for this image.
+            px_per_mm: Calibration factor currently in effect.
+
+        Returns:
+            Ratio of median detected disk diameter (mm) to
+            ``config.disk_diameter_mm``, or ``None`` if no disks were found.
+        """
+        if not disks or px_per_mm <= 0:
+            return None
+        diameters_mm = [(2.0 * d.radius_px) / px_per_mm for d in disks]
+        return float(np.median(diameters_mm)) / self.config.disk_diameter_mm
 
     def _segment_all(
         self,

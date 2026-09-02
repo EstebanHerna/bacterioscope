@@ -40,6 +40,14 @@ COLORS: dict[str, tuple[int, int, int]] = {
 _FLAG_COLOR: tuple[int, int, int] = (45, 135, 200)   # amber-orange warning in BGR
 _FLAG_RING_OFFSET: int = 6                             # pixels beyond zone radius
 
+# A solid block stamped in the top-left corner of every annotated output.
+# Lets the app detect and reject an already-annotated image re-uploaded as if
+# it were a fresh photo -- feeding Hough circle detection an image full of
+# drawn circles and text produces nonsense (hundreds of false-positive disks).
+WATERMARK_COLOR: tuple[int, int, int] = (255, 0, 255)  # pure magenta in BGR
+WATERMARK_SIZE_PX: int = 18
+_WATERMARK_TOLERANCE: int = 45  # allows for JPEG compression drift at block edges
+
 
 def _draw_zone_contour(
     image: NDArray[np.uint8],
@@ -132,4 +140,37 @@ def draw_results(
             cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1, cv2.LINE_AA,
         )
 
+    _stamp_watermark(image)
     return image
+
+
+def _stamp_watermark(image: NDArray[np.uint8]) -> None:
+    """Stamp a solid marker block in the top-left corner, in place.
+
+    Marks this image as BacterioScope output so ``has_watermark()`` can
+    reject it if it is later re-uploaded as if it were a fresh photo.
+    """
+    size = min(WATERMARK_SIZE_PX, image.shape[0], image.shape[1])
+    if size > 0:
+        image[0:size, 0:size] = WATERMARK_COLOR
+
+
+def has_watermark(image: NDArray[np.uint8]) -> bool:
+    """Check whether an image carries the BacterioScope output watermark.
+
+    Args:
+        image: BGR image array, any size.
+
+    Returns:
+        ``True`` if the top-left corner matches ``WATERMARK_COLOR`` within
+        ``_WATERMARK_TOLERANCE`` (accounts for JPEG recompression), meaning
+        this image is already an annotated pipeline output and must not be
+        re-analyzed as a fresh photograph.
+    """
+    size = min(WATERMARK_SIZE_PX, image.shape[0], image.shape[1])
+    if size <= 0:
+        return False
+    corner = image[0:size, 0:size].reshape(-1, 3).astype(np.int16)
+    target = np.array(WATERMARK_COLOR, dtype=np.int16)
+    diff = np.abs(corner - target).max(axis=1)
+    return bool(np.mean(diff <= _WATERMARK_TOLERANCE) > 0.95)

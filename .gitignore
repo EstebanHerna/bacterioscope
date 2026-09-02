@@ -10,8 +10,12 @@ build/
 *.onnx
 *.pth
 data/raw/
-data/processed/
+data/processed/*
+!data/processed/pair_annotations/
+data/processed/pair_annotations/*_numbered.png
+data/processed/pair_annotations/crops_*/
 data/models/*.pt
+data/models/single_class/
 
 .env
 .venv/

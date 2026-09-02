@@ -37,6 +37,12 @@ _COMPONENT_CSS = (
     ".bs-h1{font-size:1.35rem;font-weight:700;letter-spacing:-.025em;"
     "color:var(--bs-text-primary)}"
     ".bs-sub{font-size:.74rem;color:var(--bs-text-secondary);margin-top:3px}"
+    ".bs-val-banner{padding:10px 13px;border:1px solid var(--bs-border);"
+    "border-left:3px solid var(--bs-quality-warning);border-radius:4px;"
+    "margin:12px 0 16px;font-size:.72rem;color:var(--bs-text-secondary);"
+    "line-height:1.5}"
+    ".bs-val-banner b{color:var(--bs-text-primary)}"
+    ".bs-val-banner a{color:var(--bs-quality-warning)}"
     ".bs-sec{font-size:.60rem;font-weight:600;text-transform:uppercase;"
     "letter-spacing:.10em;color:var(--bs-text-secondary);margin-bottom:9px}"
     ".bs-mode{padding:9px 11px;border:1px solid var(--bs-border);"
@@ -501,6 +507,18 @@ def main() -> None:
     st.markdown(
         '<div class="bs-h1">BacterioScope</div>'
         '<div class="bs-sub">Kirby-Bauer analysis — CLSI M100-Ed33 (2023)</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="bs-val-banner">'
+        "<b>Validation status:</b> measurement accuracy on real clinical "
+        "photographs does not yet meet the ISO 20776-2 / EUCAST target "
+        "(Essential Agreement &ge;90%). Current identity-matched result on "
+        "the UZH real-photo reference set is well below that bar; synthetic "
+        "and controlled images perform much better. See "
+        "<a href=\"https://github.com/EstebanHerna/bacterioscope/blob/main/"
+        'docs/VALIDATION_REPORT.md" target="_blank">the full validation '
+        "report</a> for numbers and root-cause analysis.</div>",
         unsafe_allow_html=True,
     )
 

@@ -61,6 +61,17 @@ _HOUGH_PARAM2: int = 20
 _HOUGH_MIN_RADIUS: int = 10
 _HOUGH_MAX_RADIUS: int = 40
 
+# When px_per_mm is known (calibration already ran), search for disks in a tight
+# window around the physically expected radius instead of a fixed pixel range.
+# HoughCircles is known to bias its vote toward the *largest* radius that still
+# fits the edge evidence, so a loose ceiling (as in _HOUGH_MAX_RADIUS above)
+# systematically overestimates disk size -- measured at a median +28% (6mm true
+# disks reading ~7.7mm) on the real UZH photo set. A tight, calibration-derived
+# ceiling removes that degree of freedom.
+_DISK_RADIUS_MARGIN_LOW: float = 0.6
+_DISK_RADIUS_MARGIN_HIGH: float = 1.3
+_HOUGH_PARAM2_CALIBRATED: int = 45
+
 
 @dataclass
 class DiskResult:
@@ -102,10 +113,19 @@ class DiskDetector:
             not exist, Hough mode is used automatically.
         confidence: Minimum YOLOv8 confidence score in [0, 1].  Detections
             below this threshold are discarded.  Has no effect in Hough mode.
+        disk_diameter_mm: Physical diameter of a standard antibiotic disk.
+            Used to derive a calibrated Hough search radius when ``detect()``
+            is called with ``px_per_mm``.  Standard CLSI disks are 6.0 mm.
     """
-    def __init__(self, weights: Path, confidence: float = 0.5) -> None:
+    def __init__(
+        self,
+        weights: Path,
+        confidence: float = 0.5,
+        disk_diameter_mm: float = 6.0,
+    ) -> None:
         self.weights = weights
         self.confidence = confidence
+        self.disk_diameter_mm = disk_diameter_mm
         self._model: Any = None
 
     def _load_model(self) -> None:
@@ -147,7 +167,11 @@ class DiskDetector:
                 "Do not load model weights from untrusted sources."
             )
 
-    def detect(self, image: NDArray[np.uint8]) -> list[DiskResult]:
+    def detect(
+        self,
+        image: NDArray[np.uint8],
+        px_per_mm: float | None = None,
+    ) -> list[DiskResult]:
         """Detect all antibiotic disks in a plate image.
 
         Loads the YOLOv8 model on the first call.  Uses the Hough fallback
@@ -155,6 +179,12 @@ class DiskDetector:
 
         Args:
             image: BGR image array as returned by ``cv2.imread``.
+            px_per_mm: Calibration factor from ``calibrate_px_per_mm()``, if
+                already known.  When given, the Hough fallback searches for
+                disks in a tight window around the physically expected pixel
+                radius (``disk_diameter_mm`` at this scale) instead of a
+                fixed, resolution-dependent pixel range.  ``None`` preserves
+                the original broad-range behaviour.
 
         Returns:
             List of ``DiskResult`` objects, one per detected disk.  Returns
@@ -165,7 +195,7 @@ class DiskDetector:
             yolo_results = self._detect_yolo(image)
             if yolo_results:
                 return yolo_results
-        return self._detect_hough(image)
+        return self._detect_hough(image, px_per_mm)
 
     def _detect_yolo(self, image: NDArray[np.uint8]) -> list[DiskResult]:
         """Run YOLOv8 inference and convert results to DiskResult objects."""
@@ -189,37 +219,45 @@ class DiskDetector:
                 ))
         return disks
 
-    def _detect_hough(self, image: NDArray[np.uint8]) -> list[DiskResult]:
+    def _detect_hough(
+        self,
+        image: NDArray[np.uint8],
+        px_per_mm: float | None = None,
+    ) -> list[DiskResult]:
         """Detect disk-shaped circles using the Hough Circle Transform.
 
         Converts the image to grayscale, applies Gaussian blur to reduce
-        sensor noise, and runs HoughCircles with parameters tuned for standard
-        6-mm antibiotic disks on a 90-mm plate.  param1 and param2 were
-        calibrated on the synthetic test plate; adjust for very different
-        contrast characteristics.  Disk labels default to 'disk_0', 'disk_1',
-        etc. because the Hough transform cannot read printed labels.
+        sensor noise, and runs HoughCircles.  When ``px_per_mm`` is known,
+        the radius search window is derived from the physical disk size
+        (tight, calibrated) instead of the fixed broad range (fallback for
+        callers that have not calibrated yet, e.g. most existing tests).
+        Disk labels default to 'disk_0', 'disk_1', etc. because the Hough
+        transform cannot read printed labels.
 
         Args:
             image: BGR plate image.
+            px_per_mm: Calibration factor, or ``None`` for the broad-range
+                fallback search.
 
         Returns:
             List of DiskResult objects, one per detected circle.
         """
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, _DISK_BLUR_KERNEL, 2)
+        min_radius, max_radius, param2 = self._hough_search_window(px_per_mm)
         circles = cv2.HoughCircles(
             blurred,
             cv2.HOUGH_GRADIENT,
             dp=_HOUGH_DP,
             minDist=_HOUGH_MIN_DIST,
             param1=_HOUGH_PARAM1,
-            param2=_HOUGH_PARAM2,
-            minRadius=_HOUGH_MIN_RADIUS,
-            maxRadius=_HOUGH_MAX_RADIUS,
+            param2=param2,
+            minRadius=min_radius,
+            maxRadius=max_radius,
         )
         disks: list[DiskResult] = []
         if circles is not None:
-            circles = np.around(circles).astype(np.uint16)
+            circles = np.around(circles).astype(np.int32)
             for i, (cx, cy, r) in enumerate(circles[0]):
                 disks.append(DiskResult(
                     label=f"disk_{i}",
@@ -230,3 +268,24 @@ class DiskDetector:
                     bbox=(int(cx - r), int(cy - r), int(cx + r), int(cy + r)),
                 ))
         return disks
+
+    def _hough_search_window(self, px_per_mm: float | None) -> tuple[int, int, int]:
+        """Return ``(min_radius, max_radius, param2)`` for the Hough search.
+
+        With a known calibration, the window is centred on the physically
+        expected disk radius (see module docstring for why a loose fixed
+        range systematically overestimates disk size). Without one, falls
+        back to the original broad, resolution-dependent range.
+
+        Args:
+            px_per_mm: Calibration factor, or ``None``.
+
+        Returns:
+            Tuple of ``(min_radius, max_radius, param2)`` in pixels.
+        """
+        if px_per_mm is None or px_per_mm <= 0:
+            return _HOUGH_MIN_RADIUS, _HOUGH_MAX_RADIUS, _HOUGH_PARAM2
+        expected_radius = (self.disk_diameter_mm / 2.0) * px_per_mm
+        min_radius = max(3, int(expected_radius * _DISK_RADIUS_MARGIN_LOW))
+        max_radius = max(min_radius + 1, int(expected_radius * _DISK_RADIUS_MARGIN_HIGH))
+        return min_radius, max_radius, _HOUGH_PARAM2_CALIBRATED

@@ -56,3 +56,11 @@ class TestPipelineInputValidation:
             cv2.imwrite(str(path), image)
             result = self.pipeline.analyze(path)
             assert result.px_per_mm > 0
+
+    def test_watermarked_image_rejected(self, tmp_path: Path) -> None:
+        image = np.zeros((300, 300, 3), dtype=np.uint8)
+        image[0:18, 0:18] = (255, 0, 255)  # matches visualization.WATERMARK_COLOR
+        path = tmp_path / "already_annotated.png"
+        cv2.imwrite(str(path), image)
+        with pytest.raises(ValueError, match="watermark"):
+            self.pipeline.analyze(path)

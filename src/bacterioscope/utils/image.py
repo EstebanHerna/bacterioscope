@@ -66,6 +66,43 @@ def save_image(image: NDArray[np.uint8], path: str | Path) -> None:
         raise ValueError(f"Could not write image to {path}")
 
 
+def resize_canonical(
+    image: NDArray[np.uint8],
+    max_dimension: int = 1400,
+) -> tuple[NDArray[np.uint8], float]:
+    """Downscale an image so its longer side does not exceed ``max_dimension``.
+
+    Real-world plate photographs range from 640 px (Roboflow) to 4128 px
+    (phone cameras). Classical geometry parameters (HoughCircles radius
+    bounds, morphology kernels) are tuned in pixel space, so an untouched
+    4128 px photo needs a different parameter set than a 640 px one. Bringing
+    every input into a shared pixel-scale ballpark before calibration and
+    detection lets one parameter set work across cameras, and cuts inference
+    time on oversized photos.
+
+    Never upscales: images already at or below ``max_dimension`` pass through
+    unchanged, so existing small synthetic test plates are unaffected.
+
+    Args:
+        image: BGR source image, any resolution.
+        max_dimension: Maximum allowed length (in pixels) of the longer side.
+
+    Returns:
+        ``(resized_image, scale_factor)`` where ``scale_factor`` is
+        ``resized_side / original_side`` (1.0 when no resize was applied).
+        Multiply a pixel measurement from the resized image by
+        ``1 / scale_factor`` to express it in original-image pixels.
+    """
+    h, w = image.shape[:2]
+    longer_side = max(h, w)
+    if longer_side <= max_dimension:
+        return image, 1.0
+    scale = max_dimension / longer_side
+    new_w, new_h = int(round(w * scale)), int(round(h * scale))
+    resized: NDArray[np.uint8] = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    return resized, scale
+
+
 def resize_for_inference(
     image: NDArray[np.uint8],
     target_size: int = 640,
