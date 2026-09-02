@@ -1,6 +1,6 @@
 """Generate a set of synthetic test plates with varied clinical scenarios.
 
-Produces PNG images in docs/test_plates/ ready to drop into the Streamlit demo.
+Produces PNG images in examples/synthetic/ ready to drop into the Streamlit demo.
 Each plate is 540x540 px, simulating a 90 mm Mueller-Hinton agar plate.
 
 Usage:
@@ -120,8 +120,11 @@ def _mm_to_px(mm: float) -> int:
 
 
 def main() -> int:
-    out = Path(__file__).parent.parent / "docs" / "test_plates"
+    root = Path(__file__).parent.parent / "examples" / "synthetic"
+    out = root
+    out_annotated = root / "reference_annotated"
     out.mkdir(parents=True, exist_ok=True)
+    out_annotated.mkdir(parents=True, exist_ok=True)
 
     plates: list[tuple[str, dict]] = [
         # 1. Susceptible majority — organism that responds well to most antibiotics
@@ -193,14 +196,14 @@ def main() -> int:
                             seed=cfg["seed"], illumination_tilt=tilt)
         path = out / f"{fname}.png"
         cv2.imwrite(str(path), plate)
-        annotated_path = out / f"{fname}_annotated.png"
+        annotated_path = out_annotated / f"{fname}_annotated.png"
         cv2.imwrite(str(annotated_path), _annotated(plate, pos, zone_px, categories, cfg["names"]))
         generated.append(path.name)
         cat_str = "/".join(f"{c}" for c in categories)
         print(f"  {path.name}  [{cat_str}]")
 
-    print(f"\n{len(generated) * 2} images written to docs/test_plates/")
-    print("Drop any *.png (without _annotated) into the Streamlit demo to test.")
+    print(f"\n{len(generated) * 2} images written to examples/synthetic/")
+    print("Drop any *.png from examples/synthetic/ (not reference_annotated/) into the Streamlit demo to test.")
     return 0
 
 

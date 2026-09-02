@@ -39,7 +39,7 @@ Usage::
     python scripts/validate_measurement.py
     python scripts/validate_measurement.py --csv data/processed/ground_truth.csv
                                            --image-dir data/raw/dryad_uzh
-                                           --output docs/figures
+                                           --output data/processed/validation_figures
                                            --subset 50
 """
 
@@ -79,7 +79,7 @@ def _parse_args() -> argparse.Namespace:
                    help="Ground-truth CSV from prepare_dataset.py.")
     p.add_argument("--image-dir", type=Path, default=Path("data/raw/dryad_uzh"),
                    help="Directory containing plate images.")
-    p.add_argument("--output", type=Path, default=Path("docs/figures"),
+    p.add_argument("--output", type=Path, default=Path("data/processed/validation_figures"),
                    help="Directory for annotated output images.")
     p.add_argument("--report", type=Path, default=Path("docs/VALIDATION_REPORT.md"),
                    help="Output path for the Markdown validation report.")
@@ -398,7 +398,7 @@ def _write_report(
         "## Annotated examples",
         "",
         "Annotated plate images with detected halos (pipeline) and reference diameter "
-        "labels (cyan) are saved in `docs/figures/`. "
+        "labels (cyan) are saved in `data/processed/validation_figures/`. "
         "Reference labels show the SIRscan measurement for each disk, paired by rank order.",
         "",
         "## How to reproduce",

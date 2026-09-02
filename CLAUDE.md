@@ -31,11 +31,11 @@ Selected for the Biodiscovery Design Innovation Challenge (BDIC) 2026, Universid
 
 | Phase | Scope | Status |
 |---|---|---|
-| F0 | End-to-end pipeline: Hough disk detection, Otsu+watershed zone segmentation, CLSI M100-Ed33 2023 classifier (15 antibiotics, Enterobacteriaceae), Streamlit demo, CLI, FastAPI, evaluation module (CA/EA/VME/ME/mE ISO 20776-2), design system (Clinical Slate tokens, dark/light CSS), traceability fields (analysis_id UUID, image SHA-256, commit hash, CLSI edition, stage timings), 9-section scientific HTML plate reports, Bland-Altman measurement validation, panel configuration, batch processing, 228 tests (93.9% coverage), CI green on Python 3.10/3.11/3.12 | **Complete** |
-| F1 | Curate and annotate Dryad/UZH dataset (225 Gram-negative isolates, 862 phenotypic categories, clinical ground truth); produce train/val/test split and ground-truth CSV | Planned |
-| F2 | Train YOLOv8 to detect each disk and read its printed antibiotic label; integrate into detector.py replacing HoughCircles; remove manual selectbox from demo. Roboflow KB-AST dataset (102 train / 10 val / 3 test images, 29 classes) annotated and ready. ROBOFLOW_TO_CLSI mapping (14 antibiotic keys) created in detection/label_map.py. Dataset YAML with absolute paths at data/processed/roboflow_dataset.yaml. Training pending GPU torch install. | **In Progress** |
-| F3 | Recalibrate px/mm using 6 mm disk reference; run full clinical validation on held-out test split: EA >=90%, CA >=90%, VME <=1.5%, ME <=3%, mE <=10% | Planned |
-| F4 | PyPI package, Docker image (GHCR), Streamlit Community Cloud deployment, MkDocs documentation site, peer-reviewed write-up | Planned |
+| F0 | End-to-end pipeline: Hough disk detection, Otsu+watershed zone segmentation, CLSI M100-Ed33 2023 classifier (15 antibiotics, Enterobacteriaceae), Streamlit demo, CLI, FastAPI, evaluation module (CA/EA/VME/ME/mE ISO 20776-2), design system (Clinical Slate tokens, dark/light CSS), traceability fields (analysis_id UUID, image SHA-256, commit hash, CLSI edition, stage timings), 9-section scientific HTML plate reports, Bland-Altman measurement validation, panel configuration, batch processing, 236 tests (93.8% coverage), CI green on Python 3.10/3.11/3.12 | **Complete** |
+| F1 | Curate Dryad/UZH dataset ground truth. Real measurements extracted from 225 per-isolate DOCX tables (not the summary XLSX, which only has phenotype flags) via a custom parser in `prepare_dataset.py` -> 3598 records in `data/processed/ground_truth.csv`. Train/val/test split for YOLO annotation still pending. | **In Progress** |
+| F2 | YOLOv8n trained: 50 epochs on RTX 3050 (~6.5 min), Roboflow KB-AST dataset (102 train / 10 val / 3 test images, 29 classes), mAP50=0.096. `label_map.py` maps 14 antibiotic keys. `detector.py` uses YOLO first, falls back to HoughCircles automatically if YOLO finds zero disks -- manual selectbox in the demo is still the practical default until confidence improves. Confidence threshold at 0.04 (max observed confidence ~0.05) because the model is still underfit; more training images per class needed to raise it. | **In Progress** |
+| F3 | Disk-based calibration (`calibrate_from_disk_radius_px`, `use_disk_calibration` flag) implemented and wired into the pipeline, but empirically WORSE than plate-rim calibration on the current 80-image real subset (EA 12.2% vs 32.2%, MAE 7.56mm vs 4.27mm) because Hough-only disk detection has too many false positives; expected to overtake plate-rim once F2 detection confidence improves. Full clinical validation targets (EA/CA >=90%, VME <=1.5%, ME <=3%, mE <=10%) not yet met -- current real-photo baseline: EA=32.2%, MAE=4.27mm, r=0.588 (see docs/VALIDATION_REPORT.md). | **In Progress** |
+| F4 | PyPI package, Docker image (GHCR), Streamlit Community Cloud deployment, MkDocs documentation site, peer-reviewed write-up. Colab/Drive notebook already available (`colab/BacterioScope_Colab.ipynb`) as an interim shareable deliverable. | Planned |
 
 See docs/ROADMAP.md for full phase specifications.
 
@@ -67,57 +67,109 @@ See docs/ROADMAP.md for full phase specifications.
 
 ## Project layout explained
 
-This is a standard Python src-layout project:
+This is a standard Python src-layout project. Every top-level folder has exactly one job —
+if you're unsure where something goes, match it to the purpose below rather than adding a
+new folder.
 
 ```
 bacterioscope/
-    src/
-        bacterioscope/
-            __init__.py
-            __main__.py         <- enables `python -m bacterioscope`
-            pipeline.py         <- end-to-end orchestrator
-            cli.py              <- CLI entry point (Typer)
-            app.py              <- Streamlit demo
-            _app_logic.py       <- pure helpers with no Streamlit import (testable without UI)
-            detection/
-                detector.py     <- DiskDetector: YOLOv8 when weights exist, HoughCircles fallback
-                train.py        <- YOLOv8 training script (Phase 2)
-            segmentation/
-                watershed.py    <- ZoneSegmenter: Otsu + watershed
-            classification/
-                clsi.py         <- CLSIClassifier: CLSI M100-Ed33 2023 breakpoints
-            evaluation/
-                metrics.py      <- CA, EA, VME, ME, mE per ISO 20776-2
-                report.py       <- Markdown + HTML report generation
-            api/
-                routes.py       <- FastAPI endpoints
-                schemas.py      <- Pydantic v2 request/response schemas
-            utils/
-                calibration.py  <- pixel-to-mm (Phase 3: disk-based; Phase 0: plate-rim)
-                visualization.py <- annotated output images
-                image.py        <- image I/O helpers (Phase 1)
-    tests/                      <- 107 tests, mirrors src/ structure
-    scripts/
-        download_data.py        <- Dryad/UZH downloader with zip-slip protection
-        generate_demo.py        <- generates synthetic demo images in docs/
-    data/
-        raw/                    <- gitignored
-        processed/              <- gitignored
-        models/                 <- gitignored
-    docs/
-        ROADMAP.md              <- full phase specifications
-        plate_original.png      <- synthetic test plate (generated by generate_demo.py)
-        pipeline_demo.gif       <- animated pipeline walkthrough
+    src/bacterioscope/           <- all application code
+        __init__.py
+        __main__.py               <- enables `python -m bacterioscope`
+        pipeline.py                <- end-to-end orchestrator (BacterioScopePipeline)
+        cli.py                     <- CLI entry point (Typer)
+        app.py                     <- Streamlit demo
+        _app_logic.py              <- pure helpers with no Streamlit import (testable without UI)
+        design/
+            tokens.py               <- Clinical Slate palette/typography tokens (single source of color)
+        detection/
+            detector.py             <- DiskDetector: YOLOv8 if weights exist, else HoughCircles; falls
+                                        back to Hough mid-call too if YOLO finds zero disks
+            label_map.py            <- ROBOFLOW_TO_CLSI: disk abbreviation -> CLSI antibiotic key
+            train.py                <- YOLOv8 training script (Phase 2)
+        segmentation/
+            watershed.py             <- ZoneSegmenter: Otsu + contour fitting
+        classification/
+            clsi.py                  <- CLSIClassifier: CLSI M100-Ed33 2023 breakpoints
+        evaluation/
+            metrics.py                <- CA, EA, VME, ME, mE per ISO 20776-2
+            report.py                 <- Markdown evaluation report generation
+            plate_report.py           <- self-contained per-plate HTML report (base64 image)
+        panels/
+            manager.py                 <- PanelManager: load YAML, assign antibiotics by angular position
+        api/
+            routes.py                   <- FastAPI endpoints
+            schemas.py                   <- Pydantic v2 request/response schemas
+        utils/
+            calibration.py                <- px/mm: plate-rim (Phase 0) or disk-diameter (Phase 3)
+            visualization.py               <- annotated output images
+            image.py                        <- image I/O helpers
+
+    tests/                        <- mirrors src/ structure, 236 tests
+
+    scripts/                      <- one-off / operational scripts, not imported by src/
+        download_data.py           <- Dryad/UZH downloader with zip-slip protection
+        prepare_dataset.py         <- parses UZH DOCX/CSV/XLSX measurement tables -> ground_truth.csv
+        validate_measurement.py    <- runs the pipeline on real plates, computes EA/MAE/Pearson r,
+                                       writes docs/VALIDATION_REPORT.md and data/processed/validation_figures/
+        evaluate.py                 <- batch S/I/R evaluation against a labelled CSV
+        batch_analyze.py            <- folder batch processing (results.csv + errors.log)
+        generate_demo.py            <- generates docs/plate_original.png and friends
+        generate_test_plates.py     <- generates examples/synthetic/ scenarios
+
+    panels/                        <- YAML panel configs (antibiotics by clockwise position)
+        enterobacteria_clsi_12.yaml
+        enterobacteria_clsi_6.yaml
+
+    examples/                     <- sample plate photos to feed INTO the tool (inputs, not outputs)
+        README.md                   <- explains synthetic/ vs real/ vs reference_annotated/
+        synthetic/                   <- 8 generated plates, committed to git (self-owned)
+            reference_annotated/      <- same plates pre-annotated for comparison; do not upload these
+        real/                         <- real clinical photos for manual testing
+
+    notebooks/
+        pipeline_walkthrough.ipynb    <- exploratory Jupyter tour of the pipeline stages
+
+    colab/                        <- Google Colab / Drive deliverable (separate from docs/ on purpose)
+        BacterioScope_Colab.ipynb     <- self-contained notebook, auto-detects Drive folder nesting
+        BacterioScope_Drive_Package.zip <- gitignored bundle (notebook + examples + weights)
+
+    data/                         <- all gitignored except the two small validation summary plots
+        raw/                        <- downloaded datasets (Dryad/UZH, Roboflow/KB-AST, astimp)
+        processed/                   <- generated: ground_truth.csv, roboflow_dataset.yaml,
+                                        validation_figures/ (annotated real-photo outputs + bland_altman.png
+                                        + scatter_measured_vs_reference.png, the latter two ARE committed)
+        models/                      <- trained weights (yolov8_disks.pt), gitignored
+
+    docs/                         <- documentation ONLY — no test images, no deliverable bundles
+        ROADMAP.md                   <- full phase specifications
+        VALIDATION_REPORT.md         <- generated by validate_measurement.py
+        METODOLOGIA_Y_HERRAMIENTAS.md
+        RESUMEN_EVALUADORES.md
+        FUENTES_DATOS.md
+        LIMITACIONES.md
+        SECURITY_AUDIT.md
+        STATE_OF_THE_ART.md
+        plate_original.png / plate_detected.png / plate_zones.png / plate_classified.png
+                                       <- small illustration images referenced by app.py / README
+        pipeline_demo.gif             <- animated pipeline walkthrough
+
     pyproject.toml
-    CLAUDE.md                   <- this file
+    CLAUDE.md                    <- this file
     SECURITY.md
     Dockerfile
     Makefile
 ```
 
+**Rule of thumb for where new files go**: application logic -> `src/`; anything that
+demonstrates or explains the system for a human reader -> `docs/`; images or files meant
+to be *uploaded into* the tool -> `examples/`; anything a script generates and could
+regenerate again -> `data/processed/` (gitignored unless it's a small committed summary
+plot). Do not create a new top-level folder without a reason that doesn't fit one of these.
+
 Why `_app_logic.py` exists: the CI job installs without Streamlit (`[dev]` extra only). Tests that import from `app.py` would fail at import time because `app.py` has `import streamlit as st` at the module level. Pure logic (`reclassify_with_assignment`, `_UNASSIGNED`, `_ANTIBIOTIC_OPTIONS`) lives in `_app_logic.py`, which has no Streamlit dependency, so `test_app.py` can import from it without Streamlit installed.
 
-## How the pipeline works (Phase 0)
+## How the pipeline works (current)
 
 ```
 Image file (jpg/png)
@@ -126,10 +178,13 @@ Image file (jpg/png)
 pipeline.py: BacterioScopePipeline.analyze()
     |
     +---> calibration.py: detect plate circle via Hough -> compute px_per_mm
+    |         (or calibrate_from_disk_radius_px() if use_disk_calibration=True, Phase 3 --
+    |          currently performs worse than plate-rim until F2 detection is more confident,
+    |          see docs/VALIDATION_REPORT.md)
     |
     +---> detector.py: DiskDetector.detect()
-    |         If YOLOv8 weights exist -> YOLO inference (Phase 2+)
-    |         Else -> HoughCircles fallback (Phase 0)
+    |         If YOLOv8 weights exist -> YOLO inference, labels mapped via label_map.py
+    |         If YOLO finds zero disks (or no weights) -> HoughCircles fallback automatically
     |         Returns: list[DiskResult] with center, radius, label, confidence
     |
     +---> watershed.py: ZoneSegmenter.segment() (one call per disk)
@@ -154,8 +209,11 @@ The three lists `disks`, `zones`, `classifications` are parallel: index i refers
 
 ## Dataset
 
-- Dryad/UZH (Giske et al., 2024): 225 Gram-negative isolates, 862 phenotypic categories. Download: `python scripts/download_data.py`
-- Roboflow/KB-AST: community-annotated Kirby-Bauer images with bounding boxes
+- Dryad/UZH (Giske et al., 2024): 225 Gram-negative isolates. Download: `python scripts/download_data.py`.
+  Ground truth (3598 real measurements) lives in 225 per-isolate `.docx` tables under
+  `data/raw/dryad_uzh/Tables/`, parsed by `scripts/prepare_dataset.py` into `data/processed/ground_truth.csv`.
+- Roboflow/KB-AST: community-annotated Kirby-Bauer images with bounding boxes, used to train YOLOv8
+  (`data/processed/roboflow_dataset.yaml`, 102 train / 10 val / 3 test images, 29 disk classes)
 
 ## Commands
 

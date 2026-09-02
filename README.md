@@ -287,7 +287,7 @@ python scripts/validate_measurement.py  # compute EA / MAE / Pearson r
 ```
 
 Results are written to [docs/VALIDATION_REPORT.md](docs/VALIDATION_REPORT.md).
-Annotated plate images are saved in `docs/figures/`.
+Annotated plate images are saved in `data/processed/validation_figures/`.
 
 ---
 

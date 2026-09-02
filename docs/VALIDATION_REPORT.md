@@ -99,7 +99,7 @@ confidence level where false-positive disk detections are rare.
 
 ## Annotated examples
 
-Annotated plate images with detected halos (pipeline) and reference diameter labels (cyan) are saved in `docs/figures/`. Reference labels show the SIRscan measurement for each disk, paired by rank order.
+Annotated plate images with detected halos (pipeline) and reference diameter labels (cyan) are saved in `data/processed/validation_figures/`. Reference labels show the SIRscan measurement for each disk, paired by rank order.
 
 ## How to reproduce
 

@@ -129,7 +129,7 @@ The validation script compares BacterioScope zone diameters against SIRscan refe
 1. Matches disks by antibiotic label within each isolate.
 2. Computes EA (±2 mm), MAE, and Pearson r over all matched pairs.
 3. Performs **Bland-Altman analysis**: mean difference, standard deviation of differences, and ±1.96 SD limits of agreement. A non-zero mean difference indicates systematic bias; wide limits of agreement indicate imprecision.
-4. Saves scatter and Bland-Altman plots as PNG to `docs/figures/`.
+4. Saves scatter and Bland-Altman plots as PNG to `data/processed/validation_figures/`.
 5. Writes `docs/VALIDATION_REPORT.md` with all metrics and dataset provenance.
 
 ---
