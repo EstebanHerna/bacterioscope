@@ -92,7 +92,7 @@ The end-to-end pipeline is fully operational on the Hough + Otsu baseline.
 
 ## Roadmap
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) for full detail. See [docs/RESUMEN_EVALUADORES.md](docs/RESUMEN_EVALUADORES.md) for the BDIC 2026 evaluator summary (Spanish). See [docs/METODOLOGIA_Y_HERRAMIENTAS.md](docs/METODOLOGIA_Y_HERRAMIENTAS.md) for methodology and tools.
+See [docs/ROADMAP.md](docs/ROADMAP.md) for full detail. See [docs/RESUMEN_EVALUADORES.md](docs/RESUMEN_EVALUADORES.md) for the BDIC 2026 evaluator summary (Spanish). See [docs/METODOLOGIA_Y_HERRAMIENTAS.md](docs/METODOLOGIA_Y_HERRAMIENTAS.md) for methodology and tools. See [docs/STATE_OF_THE_ART.md](docs/STATE_OF_THE_ART.md) for how BacterioScope compares to existing AST systems and published research. See [docs/LIMITACIONES.md](docs/LIMITACIONES.md) for explicit known limitations, [docs/FUENTES_DATOS.md](docs/FUENTES_DATOS.md) for dataset provenance, and [docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md) for the security review.
 
 | Phase | Scope | Status |
 |---|---|---|
@@ -110,19 +110,24 @@ BacterioScope is validated against the **Dryad/UZH SIRscan dataset** (Egli et al
 225 Gram-negative clinical isolates photographed with a standardised setup and measured
 by the SIRscan automated reader under EUCAST 2023 breakpoints.
 
-### Measurement accuracy (Phase 0 baseline, Hough detector, 80-image subset)
+### Measurement accuracy (80-image real-photo subset)
 
-| Metric | Value | Target |
-|---|---|---|
-| Essential Agreement (EA, ±2 mm) | 32.2% | ≥ 90% |
-| Mean Absolute Error (MAE, mm) | 4.27 mm | — |
-| Pearson r | 0.588 | — |
+| Metric | Identity-matched (3 images, 48 pairs) | Rank-order (70 images, 1120 pairs) | Target |
+|---|---|---|---|
+| Essential Agreement (EA, ±2 mm) | 22.9% | 26.9% | ≥ 90% |
+| Mean Absolute Error (MAE, mm) | 7.18 mm | 5.31 mm | — |
+| Pearson r | -0.354 | 0.579 | — |
 
-Gap to target is expected at Phase 0: the Hough detector cannot read disk labels, so
-disks are matched to the reference by rank order rather than by antibiotic identity, and
-only 20/80 images had a matching disk count. Phase 2 (YOLOv8 label reading) and Phase 3
-(disk-based px/mm calibration) are the planned fixes — see
-[docs/VALIDATION_REPORT.md](docs/VALIDATION_REPORT.md) for the full breakdown.
+**BacterioScope does not yet meet the ISO 20776-2 / EUCAST target on real, unconstrained
+clinical photographs.** Identity matching (each disk paired to its reference by the
+antibiotic printed on it, human-verified) is the defensible number; rank-order pairing
+is reported only as an optimistic upper bound, not a measurement — see
+[docs/VALIDATION_REPORT.md](docs/VALIDATION_REPORT.md) for why the two differ and read
+the full diagnostic write-up. Leading suspect for the identity-matched result: Otsu +
+watershed zone segmentation, tuned on isolated synthetic halos, does not correctly
+separate zones on real plates with 16 closely-packed, confluent disks — measured
+diameters cluster within ~1.5mm of each other regardless of antibiotic, which is not
+biologically plausible and swamps any real signal. Not yet fixed.
 
 > **Note on standards**: the UZH reference uses EUCAST 2023 breakpoints; BacterioScope
 > classifies using CLSI M100-Ed33 2023. Only measurement accuracy (mm) is compared in

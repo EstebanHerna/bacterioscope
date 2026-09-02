@@ -32,11 +32,19 @@ each detected disk in the Streamlit interface. The phase 0 S/I/R output is
 therefore only as accurate as the user's assignment.
 
 **Consequence:** The system is not fully automated in Phase 0. Full automation
-requires the YOLOv8 model trained in Phase 2.
+requires the YOLOv8 model trained in Phase 2. The current 29-class label-reading
+model (102 training images, ~3.5 examples per class) does not reach a usable
+confidence level -- `confidence_threshold` is deliberately kept at a defensible
+0.25 floor rather than lowered to force detections out of an undertrained
+model. A single-class "disk" detector (collapsing all 29 antibiotic classes to
+one "disk" label, letting panel position resolve identity instead) reaches
+much higher mAP50 on the same 102 images and is the current best replacement
+for Hough-based localisation; it does not, by itself, remove the manual
+assignment step.
 
 ---
 
-## 3. Image quality dependency
+## 3. Image quality dependency, and confirmed failure on confluent zones
 
 Zone segmentation accuracy depends on image quality. Factors that degrade
 performance include:
@@ -50,6 +58,17 @@ performance include:
 The system includes a CLAHE (Contrast Limited Adaptive Histogram Equalization)
 option for real-plate images, but there is no guarantee of accurate segmentation
 under extreme or unusual lighting conditions.
+
+**Confirmed, not theoretical:** an identity-matched validation pass (see
+[VALIDATION_REPORT.md](VALIDATION_REPORT.md)) found that on real UZH plates
+(16 disks on one 90mm plate, confluent overlapping zones), measured diameters
+for all 16 different antibiotics cluster within ~1.5mm of each other around
+~27mm. Real Kirby-Bauer results across 16 drugs should vary far more than
+that. The Otsu + watershed segmenter -- tuned and validated on isolated
+synthetic halos -- is not correctly separating each disk's own zone from its
+neighbours on confluent real plates; it is currently the leading suspected
+cause of the measurement error reported in VALIDATION_REPORT.md, ahead of
+calibration or detection accuracy. Not yet fixed.
 
 ---
 

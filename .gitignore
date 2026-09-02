@@ -12,8 +12,10 @@ build/
 data/raw/
 data/processed/*
 !data/processed/pair_annotations/
+!data/processed/validation_figures/
 data/processed/pair_annotations/*_numbered.png
 data/processed/pair_annotations/crops_*/
+data/processed/validation_figures/annotated_*.jpg
 data/models/*.pt
 data/models/single_class/
 
