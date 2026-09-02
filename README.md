@@ -110,13 +110,19 @@ BacterioScope is validated against the **Dryad/UZH SIRscan dataset** (Egli et al
 225 Gram-negative clinical isolates photographed with a standardised setup and measured
 by the SIRscan automated reader under EUCAST 2023 breakpoints.
 
-### Measurement accuracy (Phase 0 baseline — pending dataset download)
+### Measurement accuracy (Phase 0 baseline, Hough detector, 80-image subset)
 
 | Metric | Value | Target |
 |---|---|---|
-| Essential Agreement (EA, ±2 mm) | _pending_ | ≥ 90% |
-| Mean Absolute Error (MAE, mm) | _pending_ | — |
-| Pearson r | _pending_ | — |
+| Essential Agreement (EA, ±2 mm) | 32.2% | ≥ 90% |
+| Mean Absolute Error (MAE, mm) | 4.27 mm | — |
+| Pearson r | 0.588 | — |
+
+Gap to target is expected at Phase 0: the Hough detector cannot read disk labels, so
+disks are matched to the reference by rank order rather than by antibiotic identity, and
+only 20/80 images had a matching disk count. Phase 2 (YOLOv8 label reading) and Phase 3
+(disk-based px/mm calibration) are the planned fixes — see
+[docs/VALIDATION_REPORT.md](docs/VALIDATION_REPORT.md) for the full breakdown.
 
 > **Note on standards**: the UZH reference uses EUCAST 2023 breakpoints; BacterioScope
 > classifies using CLSI M100-Ed33 2023. Only measurement accuracy (mm) is compared in

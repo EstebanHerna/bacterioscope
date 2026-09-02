@@ -107,7 +107,7 @@ def _load_ground_truth(csv_path: Path) -> dict[str, list[dict[str, str]]]:
 
 
 def _find_image(image_dir: Path, filename: str) -> Path | None:
-    """Locate an image file, trying the exact name then stem-only match."""
+    """Locate an image file by exact name, stem match, or recursive search."""
     direct = image_dir / filename
     if direct.is_file():
         return direct
@@ -116,7 +116,8 @@ def _find_image(image_dir: Path, filename: str) -> Path | None:
         candidate = image_dir / (stem + suffix)
         if candidate.is_file():
             return candidate
-    return None
+    matches = list(image_dir.rglob(filename))
+    return matches[0] if matches else None
 
 
 def _annotate_with_reference(

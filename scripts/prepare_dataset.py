@@ -37,22 +37,29 @@ _EUCAST_TO_CLSI_NAME: dict[str, str] = {
     "AMP": "ampicillin",
     "AMC": "amoxicillin-clavulanate",
     "TZP": "piperacillin-tazobactam",
+    "TPZ": "piperacillin-tazobactam",
     "CRO": "ceftriaxone",
     "CAZ": "ceftazidime",
     "FEP": "cefepime",
     "IPM": "imipenem",
     "MEM": "meropenem",
     "ERT": "ertapenem",
+    "ETP": "ertapenem",
     "DOR": "doripenem",
     "CIP": "ciprofloxacin",
     "LEV": "levofloxacin",
     "GEN": "gentamicin",
+    "CN": "gentamicin",
     "AMK": "amikacin",
+    "AK": "amikacin",
     "SXT": "trimethoprim-sulfamethoxazole",
     "AMX": "ampicillin",
+    "AM10": "ampicillin",
     "CTX": "ceftriaxone",
     "TMP": "trimethoprim-sulfamethoxazole",
 }
+
+_DOCX_MEASUREMENT_HEADER = "inhibition zone"
 
 
 def _parse_args() -> argparse.Namespace:
@@ -167,6 +174,71 @@ def _write_ground_truth(records: list[dict[str, str]], output_path: Path) -> Non
         writer.writerows(records)
 
 
+def _find_docx_tables(data_dir: Path) -> list[Path]:
+    return sorted(data_dir.rglob("Table *.docx"))
+
+
+def _isolate_id_from_docx(path: Path) -> str:
+    return path.stem.removeprefix("Table ").strip()
+
+
+def _match_image(isolate_id: str, images: dict[str, Path]) -> Path | None:
+    exact = images.get(isolate_id)
+    if exact is not None:
+        return exact
+    candidates = [v for k, v in images.items() if isolate_id in k]
+    if not candidates:
+        return None
+    original = [c for c in candidates if "original" in c.stem.lower()]
+    return original[0] if original else candidates[0]
+
+
+def _parse_docx_measurements(path: Path) -> list[tuple[str, str, str]]:
+    from docx import Document
+
+    doc = Document(path)
+    records: list[tuple[str, str, str]] = []
+    for table in doc.tables:
+        rows = [[c.text.strip() for c in row.cells] for row in table.rows]
+        if not rows or _DOCX_MEASUREMENT_HEADER not in rows[0][2].lower():
+            continue
+        for code, _name, diameter, category, *_rest in rows[1:]:
+            if code and diameter:
+                records.append((code.strip().upper(), diameter.strip(), category.strip().upper()))
+    return records
+
+
+def _process_docx_dir(
+    data_dir: Path, docx_files: list[Path], images: dict[str, Path],
+    source_name: str, standard: str,
+) -> list[dict[str, str]]:
+    output: list[dict[str, str]] = []
+    skipped_images = 0
+    for docx_path in docx_files:
+        isolate_id = _isolate_id_from_docx(docx_path)
+        image_path = _match_image(isolate_id, images)
+        if image_path is None:
+            skipped_images += 1
+            continue
+        for code, diameter, category in _parse_docx_measurements(docx_path):
+            try:
+                float(diameter)
+            except ValueError:
+                continue
+            output.append({
+                "source": source_name,
+                "image_filename": image_path.name,
+                "antibiotic_code": code,
+                "antibiotic_name": _EUCAST_TO_CLSI_NAME.get(code, code.lower()),
+                "zone_diameter_mm_ref": diameter,
+                "category_ref": category if category in {"S", "I", "R"} else "",
+                "standard": standard,
+            })
+    if skipped_images:
+        print(f"    Skipped {skipped_images} isolates (no matching image).")
+    return output
+
+
 def _process_single_dir(
     data_dir: Path, source_name: str, standard: str
 ) -> list[dict[str, str]]:
@@ -176,6 +248,12 @@ def _process_single_dir(
     print(f"  Scanning {data_dir} ...")
     images = _find_images(data_dir)
     print(f"    Found {len(images)} plate images.")
+
+    docx_files = _find_docx_tables(data_dir)
+    if docx_files:
+        print(f"    Found {len(docx_files)} per-isolate DOCX tables.")
+        return _process_docx_dir(data_dir, docx_files, images, source_name, standard)
+
     meas_file = _find_measurements_file(data_dir)
     if meas_file is None:
         print(f"    No measurements file found in {data_dir}, skipping.", file=sys.stderr)

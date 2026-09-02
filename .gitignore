@@ -34,6 +34,7 @@ mlruns/
 graphify-out/
 
 docs/*.zip
+docs/figures/annotated_*.jpg
 
 .claude/
 
