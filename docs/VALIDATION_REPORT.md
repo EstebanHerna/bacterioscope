@@ -78,6 +78,25 @@ Classical EA (ISO 20776-2) is defined for MIC broth microdilution: the test-syst
 - 3.12.1. original.jpg — disk count mismatch
 - ... and 40 more (see failed_images.log)
 
+## Phase 3 calibration experiment (disk-based vs plate-rim)
+
+`PipelineConfig.use_disk_calibration` (see `calibrate_from_disk_radius_px()`) computes
+px/mm from the median detected disk radius (6 mm physical reference) instead of the
+plate rim. Run with `python scripts/validate_measurement.py --disk-calibration` to
+enable it. On this 80-image subset it currently performs **worse** than plate-rim
+calibration:
+
+| Calibration | EA (±2mm) | MAE | Bias |
+|---|---|---|---|
+| Plate rim (default) | 32.2% | 4.27 mm | +1.41 mm |
+| Disk-based (Phase 3) | 12.2% | 7.56 mm | +7.35 mm |
+
+Reason: without YOLOv8 reading disk labels reliably yet, the Hough fallback's detected
+"disks" include false positives from agar texture and lawn edges, so the median disk
+radius is a noisier reference than the plate rim. Disk-based calibration is expected to
+overtake plate-rim calibration once F2 (YOLOv8 label reading) is trained to a
+confidence level where false-positive disk detections are rare.
+
 ## Annotated examples
 
 Annotated plate images with detected halos (pipeline) and reference diameter labels (cyan) are saved in `docs/figures/`. Reference labels show the SIRscan measurement for each disk, paired by rank order.

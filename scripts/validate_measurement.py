@@ -89,6 +89,8 @@ def _parse_args() -> argparse.Namespace:
                    help="Limit to first N images (0 = all, useful for quick tests).")
     p.add_argument("--max-annotated", type=int, default=0,
                    help="Save at most N annotated images (0 = all). Minimum 5 recommended.")
+    p.add_argument("--disk-calibration", action="store_true",
+                   help="Use disk-diameter calibration (Phase 3) instead of plate-rim calibration.")
     return p.parse_args()
 
 
@@ -443,7 +445,7 @@ def main() -> None:
         filenames = filenames[: args.subset]
         log.info("Subset mode: evaluating %d of %d images.", args.subset, len(ground_truth))
 
-    pipeline = BacterioScopePipeline(PipelineConfig())
+    pipeline = BacterioScopePipeline(PipelineConfig(use_disk_calibration=args.disk_calibration))
 
     all_measured: list[float] = []
     all_reference: list[float] = []
