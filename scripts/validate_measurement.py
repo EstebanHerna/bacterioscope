@@ -70,6 +70,7 @@ log = logging.getLogger(__name__)
 
 _EA_MARGIN_MM = 2.0
 _IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
+_PAIR_ANNOTATIONS_DIR = Path("data/processed/pair_annotations")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -106,6 +107,60 @@ def _load_ground_truth(csv_path: Path) -> dict[str, list[dict[str, str]]]:
         for row in csv.DictReader(fh):
             rows[row["image_filename"]].append(row)
     return dict(rows)
+
+
+def _load_identity_pairs(pairs_dir: Path, image_filename: str) -> dict[int, str] | None:
+    """Load a human-verified disk-index -> antibiotic-code mapping, if it exists.
+
+    Produced by ``scripts/annotate_pairs.py``. Rank-order pairing assumes zone
+    size ordering matches between pipeline and reference, which is not
+    guaranteed on real photos; identity pairing removes that assumption for
+    the subset of images that have been manually annotated.
+
+    Args:
+        pairs_dir: Directory containing ``<stem>_pairs.csv`` files.
+        image_filename: Ground-truth CSV image filename (e.g. "1.1.1. original.jpg").
+
+    Returns:
+        ``{disk_index: antibiotic_code}`` for rows with a non-empty code, or
+        ``None`` if no annotation file exists for this image.
+    """
+    pairs_path = pairs_dir / f"{Path(image_filename).stem}_pairs.csv"
+    if not pairs_path.is_file():
+        return None
+    mapping: dict[int, str] = {}
+    with pairs_path.open(newline="", encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            code = row["antibiotic_code"].strip()
+            if code:
+                mapping[int(row["disk_index"])] = code
+    return mapping or None
+
+
+def _match_by_identity(
+    zones: list[ZoneResult],
+    ref_rows: list[dict[str, str]],
+    identity_map: dict[int, str],
+) -> list[tuple[float, float]]:
+    """Pair measured zone diameters to reference rows by antibiotic code.
+
+    Args:
+        zones: Zone results in ``DiskDetector.detect()`` order (same order
+            ``annotate_pairs.py`` used to assign ``disk_index``).
+        ref_rows: Ground-truth rows for this image.
+        identity_map: ``{disk_index: antibiotic_code}`` from ``_load_identity_pairs``.
+
+    Returns:
+        List of ``(measured_mm, reference_mm)`` tuples for disks whose code
+        matched a reference row. Silently skips codes with no reference match.
+    """
+    ref_by_code = {r["antibiotic_code"]: float(r["zone_diameter_mm_ref"]) for r in ref_rows}
+    pairs: list[tuple[float, float]] = []
+    for disk_index, code in identity_map.items():
+        if disk_index >= len(zones) or code not in ref_by_code:
+            continue
+        pairs.append((zones[disk_index].diameter_mm, ref_by_code[code]))
+    return pairs
 
 
 def _find_image(image_dir: Path, filename: str) -> Path | None:
@@ -160,18 +215,31 @@ def _run_image(
     pipeline: BacterioScopePipeline,
     output_dir: Path,
     save_annotated: bool = True,
-) -> tuple[list[float], list[float], bool]:
-    """Run pipeline on one image and return (measured_mm, reference_mm, count_ok).
+    pairs_dir: Path = _PAIR_ANNOTATIONS_DIR,
+) -> tuple[list[float], list[float], bool, list[tuple[float, float]]]:
+    """Run pipeline on one image and return rank pairs plus any identity pairs.
 
     Saves an annotated image to output_dir when save_annotated is True.
     When disk counts match, the annotated image includes reference diameter
     labels drawn via _annotate_with_reference.
-    Returns empty lists and False when disk count mismatches or pipeline fails.
+    Returns empty rank lists and False when disk count mismatches or pipeline fails,
+    but still checks for identity pairs (those do not depend on disk count matching).
+
+    Returns:
+        ``(measured_mm, reference_mm, count_ok, identity_pairs)`` where the
+        first three describe rank-order matching and ``identity_pairs`` is a
+        list of ``(measured_mm, reference_mm)`` from human-verified disk
+        identity, independent of ``count_ok``.
     """
     result = pipeline.analyze(str(image_path))
     measured_mm = [z.diameter_mm for z in result.zones if z.diameter_mm > 0]
     ref_mm = [float(r["zone_diameter_mm_ref"]) for r in ref_rows]
     count_ok = len(measured_mm) == len(ref_mm)
+
+    identity_map = _load_identity_pairs(pairs_dir, image_path.name)
+    identity_pairs = (
+        _match_by_identity(result.zones, ref_rows, identity_map) if identity_map else []
+    )
 
     if save_annotated and result.annotated_image is not None:
         img: NDArray[np.uint8] = (
@@ -188,10 +256,10 @@ def _run_image(
             "%s: detected %d disks, reference has %d — excluding from EA.",
             image_path.name, len(measured_mm), len(ref_mm),
         )
-        return [], [], False
+        return [], [], False, identity_pairs
 
     pairs = match_diameters_by_rank(measured_mm, ref_mm)
-    return [p[0] for p in pairs], [p[1] for p in pairs], True
+    return [p[0] for p in pairs], [p[1] for p in pairs], True, identity_pairs
 
 
 def _bland_altman_stats(
@@ -302,6 +370,7 @@ def _write_report(
     mae: float,
     pearson_r: float,
     ba: dict[str, float] | None = None,
+    identity_stats: dict[str, float] | None = None,
 ) -> None:
     """Write the Markdown validation report, replacing all pending placeholders."""
     lines = [
@@ -324,12 +393,17 @@ def _write_report(
         "",
         "Full S/I/R validation against a CLSI-annotated reference is planned for Phase 3.",
         "",
-        "### Matching strategy — Phase 0 limitation",
+        "### Matching strategy",
         "",
-        "Disks are matched to reference measurements by **rank-order pairing** "
-        "(both sets sorted ascending by diameter). "
-        "This is an approximation valid when zone-size rank order is consistent across images. "
-        "Full per-antibiotic matching requires Phase 2 (YOLOv8 label reading).",
+        "Two strategies are reported, clearly separated below: **identity matching** "
+        "(each disk paired to its reference by the antibiotic printed on it, "
+        "human-verified) where annotation exists, and **rank-order pairing** "
+        "(both sets sorted ascending and paired by position) everywhere else. "
+        "Rank-order pairing does not verify that the same physical disk is "
+        "being compared and is reported only as an optimistic upper bound, "
+        "never as the project's accuracy figure. Automatic per-antibiotic "
+        "matching without manual annotation requires Phase 2 (YOLOv8 label "
+        "reading) at a confidence level that is not yet reliable.",
         "",
         "## Dataset summary",
         "",
@@ -344,6 +418,45 @@ def _write_report(
         "",
         "## Measurement accuracy",
         "",
+    ]
+    if identity_stats:
+        lines += [
+            "### Identity-matched — the real number",
+            "",
+            "Each disk matched to its reference by antibiotic identity "
+            "(human-verified from the printed disk label), not by sorted rank. "
+            "This is the defensible accuracy figure for the project.",
+            "",
+            "| Metric | Value | Target |",
+            "|---|---|---|",
+            f"| Essential Agreement (EA, +-2 mm) | **{identity_stats['ea']:.1%}** | >= 90% |",
+            f"| Mean Absolute Error (MAE) | **{identity_stats['mae']:.2f} mm** | — |",
+            f"| Pearson r | **{identity_stats['pearson_r']:.3f}** | — |",
+            f"| Images identity-annotated | {int(identity_stats['n_images'])} |",
+            f"| Disk-antibiotic pairs (identity) | {int(identity_stats['n_pairs'])} |",
+            "",
+            "Annotate more images with `python scripts/annotate_pairs.py --batch "
+            "data/raw/dryad_uzh/images_original --limit N` to grow this sample; "
+            "20-30 images gives a reasonably stable estimate.",
+            "",
+        ]
+    else:
+        lines += [
+            "### Identity-matched — not yet available",
+            "",
+            "No images have been identity-annotated yet. Run "
+            "`python scripts/annotate_pairs.py --batch <dir>` and fill in the "
+            "generated `*_pairs.csv` files, then re-run this script.",
+            "",
+        ]
+    lines += [
+        "### Rank-order pairing — optimistic upper bound, not a measurement",
+        "",
+        "Both diameter lists sorted ascending and paired by position. This does "
+        "not verify that the same physical disk is being compared, and "
+        "inflates agreement whenever measurement error does not reorder the "
+        "list — do not report this as the project's accuracy figure.",
+        "",
         "| Metric | Value | Target | Criterion |",
         "|---|---|---|---|",
         f"| Essential Agreement (EA, +-2 mm) | **{ea:.1%}** | >= 90% | "
@@ -351,7 +464,7 @@ def _write_report(
         f"| Mean Absolute Error (MAE) | **{mae:.2f} mm** | — | mm |",
         f"| Pearson r | **{pearson_r:.3f}** | — | — |",
         "",
-        "### Bland-Altman limits of agreement",
+        "### Bland-Altman limits of agreement (rank-order pairs)",
         "",
     ]
     if ba:
@@ -377,6 +490,71 @@ def _write_report(
         "EA is **adapted** as the fraction of diameter measurements within **+-2 mm** of the "
         "SIRscan reference, consistent with EUCAST EDef 13.2 inter-laboratory reproducibility. "
         "This adaptation must be disclosed when comparing to ISO 20776-2 EA figures.",
+        "",
+        "## Diagnostic findings (this validation round)",
+        "",
+        "A first identity-matched validation pass surfaced a structural problem "
+        "beyond calibration or detection: on real UZH plates (16 disks packed "
+        "onto one 90mm plate with confluent, overlapping inhibition zones), "
+        "measured zone diameters cluster tightly (stdev ~1.4-1.6mm) around "
+        "~27mm regardless of which antibiotic the disk carries. Real Kirby-Bauer "
+        "results for 16 different drugs against one organism should vary far "
+        "more (roughly 10-35mm) than that. The Otsu + watershed segmenter, "
+        "tuned on isolated synthetic halos, is converging on a shared confluent "
+        "boundary rather than each disk's own zone edge -- it measures the same "
+        "thing 16 times, not 16 different biological responses. This is the "
+        "leading suspect for why identity-matched Pearson r is near zero or "
+        "negative even after the detection-radius and confidence-threshold "
+        "fixes below: there is little real signal in the measurements to "
+        "correlate against. Fixing this requires segmentation aware of "
+        "neighbouring disks (e.g. a distance-transform watershed seeded from "
+        "all detected disks at once, not an independent Otsu threshold per "
+        "isolated ROI) -- not yet implemented.",
+        "",
+        "Two other fixes landed this round, with a measurable before/after:",
+        "",
+        "| Fix | Before | After |",
+        "|---|---|---|",
+        "| Hough disk radius: fixed pixel range vs calibration-derived window "
+        "(detector.py) | Median disk read as 6mm=~7.7mm (+28% bias); wild "
+        "over-detection (100-217 false circles) on several images | "
+        "Systematic bias much smaller (~-15 to -20% on clean detections); "
+        "false-circle storms eliminated |",
+        "| Confidence threshold: 0.04 (post-hoc lowered to force a "
+        "29-class model to emit something) vs 0.25 (defensible floor) | "
+        "A single ~0.05-confidence YOLO false positive could pre-empt 16 "
+        "reliable Hough detections (hybrid fallback only tries Hough when "
+        "YOLO returns nothing) | Images with correct disk count: 24/80 -> "
+        "70/80 |",
+        "",
+        "What this means for the headline numbers: rank-order EA moved from "
+        "32.8% to 26.9% across this round -- a *drop*, not an improvement, "
+        "because the fixed detector now processes far more of the previously-"
+        "excluded difficult images instead of silently failing on them. Fewer "
+        "images being thrown out is progress even though the visible EA number "
+        "went down; it is a more honest measurement over a harder, more "
+        "complete sample, not a regression.",
+        "",
+        "## Still unresolved",
+        "",
+        "- **Zone segmentation on confluent real plates** (above) -- the "
+        "single largest suspected contributor to remaining error, not yet fixed.",
+        "- **Identity-annotated sample is small** (3 images, 48 pairs). Needs "
+        "20-30 images (`scripts/annotate_pairs.py`) for a stable estimate; the "
+        "current identity EA/MAE/r should be read as directional, not final.",
+        "- **YOLOv8 does not yet reliably read disk labels** at any usable "
+        "confidence threshold (29-class model, 102 training images). A "
+        "single-class 'disk' detector trained on the same images reaches "
+        "much higher mAP50 in early epochs (see Phase 2 status in "
+        "docs/ROADMAP.md / CLAUDE.md) and can replace Hough for localisation, "
+        "but disk *identity* still resolves through panel position, not "
+        "label reading, until far more labelled data exists.",
+        "- **EA is well below the ISO 20776-2 / EUCAST EDef 13.2 target of "
+        "90%** on both matching strategies. State plainly: BacterioScope does "
+        "not yet meet the accuracy bar for real, unconstrained clinical "
+        "photographs. It performs acceptably on synthetic and controlled "
+        "images; real-photo accuracy is an open problem this report exists "
+        "to make visible, not to paper over.",
         "",
         "## Excluded images",
         "",
@@ -406,6 +584,10 @@ def _write_report(
         "```bash",
         "python scripts/download_data.py       # follow manual download prompt",
         "python scripts/prepare_dataset.py     # normalise CSV",
+        "# Optional but recommended: identity-annotate a sample so EA/MAE/r",
+        "# are a real measurement, not a rank-order upper bound.",
+        "python scripts/annotate_pairs.py --batch data/raw/dryad_uzh/images_original --limit 20",
+        "# ... fill in the generated *_pairs.csv files, then:",
         "python scripts/validate_measurement.py  # compute EA / MAE / Pearson r",
         "# Quick subset (first 20 images):",
         "python scripts/validate_measurement.py --subset 20",
@@ -449,6 +631,9 @@ def main() -> None:
 
     all_measured: list[float] = []
     all_reference: list[float] = []
+    identity_measured: list[float] = []
+    identity_reference: list[float] = []
+    n_identity_images = 0
     failures: list[str] = []
     n_matched = 0
     n_annotated = 0
@@ -461,7 +646,7 @@ def main() -> None:
             continue
         save = args.max_annotated == 0 or n_annotated < args.max_annotated
         try:
-            m_mm, r_mm, count_ok = _run_image(
+            m_mm, r_mm, count_ok, id_pairs = _run_image(
                 img_path, ground_truth[filename], pipeline, args.output,
                 save_annotated=save,
             )
@@ -469,6 +654,10 @@ def main() -> None:
             log.warning("Pipeline failed on %s: %s", filename, exc)
             failures.append(f"{filename} — pipeline error: {type(exc).__name__}: {exc}")
             continue
+        if id_pairs:
+            identity_measured.extend(p[0] for p in id_pairs)
+            identity_reference.extend(p[1] for p in id_pairs)
+            n_identity_images += 1
         if not count_ok:
             failures.append(f"{filename} — disk count mismatch")
             continue
@@ -508,6 +697,23 @@ def main() -> None:
         ba["mean_diff_mm"], ba["loa_lower_mm"], ba["loa_upper_mm"],
     )
 
+    identity_stats = None
+    if len(identity_measured) >= 2:
+        id_meas_arr = np.asarray(identity_measured)
+        id_ref_arr = np.asarray(identity_reference)
+        identity_stats = {
+            "n_images": n_identity_images,
+            "n_pairs": len(identity_measured),
+            "ea": float(np.mean(np.abs(id_meas_arr - id_ref_arr) <= _EA_MARGIN_MM)),
+            "mae": zone_diameter_stats(identity_measured, identity_reference)["mae_mm"],
+            "pearson_r": zone_diameter_stats(identity_measured, identity_reference)["pearson_r"],
+        }
+        log.info(
+            "Identity-matched (%d images, %d pairs): EA=%.1f%% MAE=%.2fmm r=%.3f",
+            identity_stats["n_images"], identity_stats["n_pairs"],
+            identity_stats["ea"] * 100, identity_stats["mae"], identity_stats["pearson_r"],
+        )
+
     _try_save_plots(all_measured, all_reference, args.output)
     _write_report(
         args.report,
@@ -519,6 +725,7 @@ def main() -> None:
         mae=mae,
         pearson_r=r,
         ba=ba,
+        identity_stats=identity_stats,
     )
     log.info("Report written: %s", args.report)
 
