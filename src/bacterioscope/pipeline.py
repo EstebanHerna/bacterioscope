@@ -46,7 +46,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import subprocess
+import subprocess  # nosec B404
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -74,8 +74,9 @@ _SOFTWARE_VERSION: str = "0.1.0"
 
 def _get_commit_hash() -> str:
     """Return the current git short hash, or 'unknown' if git is unavailable."""
+    # Fixed argv, no shell, no user input -- safe for traceability metadata only.
     try:
-        proc = subprocess.run(
+        proc = subprocess.run(  # nosec B603 B607
             ["git", "rev-parse", "--short", "HEAD"],
             capture_output=True,
             text=True,
@@ -83,8 +84,8 @@ def _get_commit_hash() -> str:
         )
         if proc.returncode == 0:
             return proc.stdout.strip()
-    except Exception:
-        pass
+    except (OSError, subprocess.SubprocessError):
+        log.debug("git rev-parse unavailable; commit hash will be 'unknown'.")
     return "unknown"
 
 
