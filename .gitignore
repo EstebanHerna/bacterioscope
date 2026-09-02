@@ -33,6 +33,8 @@ mlruns/
 
 graphify-out/
 
+docs/*.zip
+
 .claude/
 
 .vscode/
