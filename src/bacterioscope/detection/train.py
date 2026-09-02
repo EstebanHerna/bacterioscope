@@ -60,6 +60,11 @@ def _parse_args() -> argparse.Namespace:
         "--imgsz", type=int, default=640,
         help="Input image size in pixels (default: 640).",
     )
+    parser.add_argument(
+        "--batch", type=int, default=16,
+        help="Batch size, or -1 for Ultralytics auto-batch (default: 16). "
+             "Reduce this before reducing --imgsz if training exceeds GPU memory.",
+    )
     return parser.parse_args()
 
 
@@ -91,6 +96,7 @@ def train(
     output_dir: Path,
     device: str,
     imgsz: int,
+    batch: int = 16,
 ) -> Path:
     """Fine-tune a YOLOv8 model and copy the best weights to output_dir.
 
@@ -101,6 +107,8 @@ def train(
         output_dir: Directory to save the final weights file.
         device: Compute device string ('cpu', '0', '0,1').
         imgsz: Training image size in pixels.
+        batch: Batch size, or -1 for Ultralytics auto-batch. Lower this
+            before lowering ``imgsz`` if training exceeds GPU memory.
 
     Returns:
         Path to the saved ``yolov8_disks.pt`` inside ``output_dir``.
@@ -122,6 +130,7 @@ def train(
         data=str(data_yaml.resolve()),
         epochs=epochs,
         imgsz=imgsz,
+        batch=batch,
         device=device,
         project=str(abs_output),
         name="disk_detector",
@@ -153,6 +162,7 @@ def main() -> None:
             output_dir=args.output,
             device=args.device,
             imgsz=args.imgsz,
+            batch=args.batch,
         )
     except ImportError as exc:
         print(f"Error: {exc}", file=sys.stderr)
