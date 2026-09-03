@@ -112,22 +112,26 @@ by the SIRscan automated reader under EUCAST 2023 breakpoints.
 
 ### Measurement accuracy (80-image real-photo subset)
 
-| Metric | Identity-matched (3 images, 48 pairs) | Rank-order (70 images, 1120 pairs) | Target |
+| Metric | Identity-matched (3 images, 48 pairs) | Rank-order (59 images, 943 pairs) | Target |
 |---|---|---|---|
-| Essential Agreement (EA, ±2 mm) | 22.9% | 26.9% | ≥ 90% |
-| Mean Absolute Error (MAE, mm) | 7.18 mm | 5.31 mm | — |
-| Pearson r | -0.354 | 0.579 | — |
+| Essential Agreement (EA, ±2 mm) | 22.9% | 27.4% | ≥ 90% |
+| Mean Absolute Error (MAE, mm) | 7.11 mm | 5.27 mm | — |
+| Pearson r | -0.262 | 0.603 | — |
 
 **BacterioScope does not yet meet the ISO 20776-2 / EUCAST target on real, unconstrained
 clinical photographs.** Identity matching (each disk paired to its reference by the
 antibiotic printed on it, human-verified) is the defensible number; rank-order pairing
 is reported only as an optimistic upper bound, not a measurement — see
 [docs/VALIDATION_REPORT.md](docs/VALIDATION_REPORT.md) for why the two differ and read
-the full diagnostic write-up. Leading suspect for the identity-matched result: Otsu +
-watershed zone segmentation, tuned on isolated synthetic halos, does not correctly
-separate zones on real plates with 16 closely-packed, confluent disks — measured
-diameters cluster within ~1.5mm of each other regardless of antibiotic, which is not
-biologically plausible and swamps any real signal. Not yet fixed.
+the full diagnostic write-up. Zone segmentation now splits confluent (touching/overlapping)
+zones with a Voronoi partition instead of one shared Otsu blob — verified correct on a
+controlled case with two genuinely different zone sizes — but several adjacent disk pairs
+on the densest real UZH plates (16 disks on one 90mm plate) turned out to have **zero
+recoverable boundary signal in the photograph itself** (checked directly: flat pixel
+intensity across the entire gap between two disks). No segmentation algorithm can recover
+information a fully confluent photograph never captured — a routine clinical panel with
+properly spaced disks (6-12, not 16 packed onto one plate) should confluence far less
+often, but this has not yet been measured directly.
 
 > **Note on standards**: the UZH reference uses EUCAST 2023 breakpoints; BacterioScope
 > classifies using CLSI M100-Ed33 2023. Only measurement accuracy (mm) is compared in

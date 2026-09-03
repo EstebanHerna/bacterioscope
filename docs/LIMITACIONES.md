@@ -59,16 +59,26 @@ The system includes a CLAHE (Contrast Limited Adaptive Histogram Equalization)
 option for real-plate images, but there is no guarantee of accurate segmentation
 under extreme or unusual lighting conditions.
 
-**Confirmed, not theoretical:** an identity-matched validation pass (see
-[VALIDATION_REPORT.md](VALIDATION_REPORT.md)) found that on real UZH plates
-(16 disks on one 90mm plate, confluent overlapping zones), measured diameters
-for all 16 different antibiotics cluster within ~1.5mm of each other around
-~27mm. Real Kirby-Bauer results across 16 drugs should vary far more than
-that. The Otsu + watershed segmenter -- tuned and validated on isolated
-synthetic halos -- is not correctly separating each disk's own zone from its
-neighbours on confluent real plates; it is currently the leading suspected
-cause of the measurement error reported in VALIDATION_REPORT.md, ahead of
-calibration or detection accuracy. Not yet fixed.
+**Confirmed, not theoretical, and partially addressed:** an identity-matched
+validation pass (see [VALIDATION_REPORT.md](VALIDATION_REPORT.md)) found that
+on real UZH plates (16 disks on one 90mm plate, confluent overlapping zones),
+measured diameters for all 16 different antibiotics clustered within ~1.5mm of
+each other -- the segmenter was measuring one shared confluent blob for every
+disk, not 16 different biological responses. `ZoneSegmenter.segment_all()` now
+splits confluent zones with a Voronoi partition (each pixel assigned to its
+geometrically nearest disk), verified correct on a controlled case with two
+disks of deliberately different true zone sizes (recovered exactly: 40mm and
+20mm). This is real, tested progress for plates with *partial* overlap.
+
+It is not a complete fix. Checked directly on the real UZH images: for several
+adjacent disk pairs on the densest plates, the raw pixel intensity between the
+two disks is completely flat across the entire gap -- no rise, no dip. When
+two zones are that fully confluent, there is no boundary left in the
+photograph for any algorithm, geometric or intensity-based, to recover; a
+human reading the same photo by eye faces the identical ambiguity. This
+16-disk-dense research protocol is not representative of routine clinical
+practice (6-12 disks with normal CLSI spacing); whether ordinary clinical
+panels confluence this severely has not yet been measured directly.
 
 ---
 

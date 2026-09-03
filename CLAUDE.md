@@ -31,10 +31,10 @@ Selected for the Biodiscovery Design Innovation Challenge (BDIC) 2026, Universid
 
 | Phase | Scope | Status |
 |---|---|---|
-| F0 | End-to-end pipeline: Hough disk detection, Otsu+watershed zone segmentation, CLSI M100-Ed33 2023 classifier (15 antibiotics, Enterobacteriaceae), Streamlit demo, CLI, FastAPI, evaluation module (CA/EA/VME/ME/mE ISO 20776-2), design system (Clinical Slate tokens, dark/light CSS), traceability fields (analysis_id UUID, image SHA-256, commit hash, CLSI edition, stage timings), 9-section scientific HTML plate reports, Bland-Altman measurement validation, panel configuration, batch processing, 241 tests (93.8%+ coverage), CI green on Python 3.10/3.11/3.12 | **Complete** |
+| F0 | End-to-end pipeline: Hough disk detection, Otsu+watershed zone segmentation, CLSI M100-Ed33 2023 classifier (15 antibiotics, Enterobacteriaceae), Streamlit demo, CLI, FastAPI, evaluation module (CA/EA/VME/ME/mE ISO 20776-2), design system (Clinical Slate tokens, dark/light CSS), traceability fields (analysis_id UUID, image SHA-256, commit hash, CLSI edition, stage timings), 9-section scientific HTML plate reports, Bland-Altman measurement validation, panel configuration, batch processing, 247 tests (93.8%+ coverage), CI green on Python 3.10/3.11/3.12 | **Complete** |
 | F1 | Curate Dryad/UZH dataset ground truth. Real measurements extracted from 225 per-isolate DOCX tables (not the summary XLSX, which only has phenotype flags) via a custom parser in `prepare_dataset.py` -> 3598 records in `data/processed/ground_truth.csv`. 3 images identity-annotated (`scripts/annotate_pairs.py`, `data/processed/pair_annotations/`) with human-verified disk-to-antibiotic pairing, read directly off the printed disk labels; growing this to 20-30 images is the next step. Train/val/test split for YOLO annotation still pending. | **In Progress** |
 | F2 | 29-class YOLOv8n (Roboflow KB-AST, 102 train / 10 val / 3 test images) trained 50 epochs, mAP50=0.096 -- documented as an experiment, not usable at any defensible confidence threshold (`confidence_threshold` restored to 0.25; do not lower it to force detections). A single-class "disk" detector (`scripts/convert_single_class_dataset.py` collapses the 29 antibiotic classes to one "disk" label; identity resolves via panel position, unchanged) reaches mAP50 ~0.9 within ~20 epochs on the same 102 images -- training in progress at imgsz=1280, `data/models/single_class/`. `detector.py`'s hybrid fallback (YOLO first, Hough if YOLO returns nothing) had a real bug: a single ~0.05-confidence 29-class false positive could pre-empt 16 reliable Hough detections; fixed by the confidence floor above (disk count matching real UZH photos: 24/80 -> 70/80 images). | **In Progress** |
-| F3 | Two real fixes landed: (1) Hough disk-radius search is now derived from the already-known px/mm calibration instead of a fixed pixel range tuned for 540px synthetic images (`detector.py::_hough_search_window`), reducing a systematic +28% disk-size overestimate and eliminating false-circle storms (100-217 spurious detections) on large real photos; (2) canonical image resize (`resize_canonical`, longer side <=1400px, downscale-only) keeps one geometry parameter set valid across camera resolutions. Disk-based calibration (`use_disk_calibration`) is implemented but still underperforms plate-rim calibration -- root cause under investigation, see below. Full clinical validation targets (EA/CA >=90%, VME <=1.5%, ME <=3%, mE <=10%) not met. Identity-matched real-photo result (3 images, 48 pairs, the defensible number): EA=22.9%, MAE=7.18mm, r=-0.354. Leading suspected cause, confirmed this round: Otsu+watershed zone segmentation does not separate individual zones on real plates with 16 closely-packed, confluent disks -- measured diameters cluster within ~1.5mm of each other regardless of antibiotic (see docs/VALIDATION_REPORT.md, docs/LIMITACIONES.md). Not yet fixed. | **In Progress** |
+| F3 | Detection-side fixes: Hough disk-radius search derived from px/mm calibration instead of a fixed pixel range (`detector.py::_hough_search_window`), reducing a systematic +28% disk-size overestimate and eliminating false-circle storms on large real photos; canonical image resize (`resize_canonical`, <=1400px, downscale-only) keeps one geometry parameter set valid across camera resolutions; Hough's accumulator threshold now sweeps to the longest stable count instead of one fixed value (`_hough_stable_circles`), since no single value worked for both real photos and synthetic plates. Segmentation-side fix: `ZoneSegmenter.segment_all()` now splits confluent (touching/overlapping) zones with a Voronoi partition instead of measuring one shared Otsu blob per neighbourhood -- verified correct on a controlled case (two disks, deliberately different true sizes, recovered exactly as 40mm and 20mm; `tests/test_watershed.py::TestSegmentAllVoronoiSplit`). Real-world effect on the densest UZH panels was modest because several adjacent disk pairs there have literally zero recoverable boundary signal in the photograph (checked directly: flat pixel intensity across the whole gap) -- not a segmentation bug, a photograph limitation of the 16-disk-dense research protocol. Disk-based calibration (`use_disk_calibration`) still underperforms plate-rim calibration. Full clinical validation targets (EA/CA >=90%, VME <=1.5%, ME <=3%, mE <=10%) not met. Identity-matched real-photo result (3 images, 48 pairs, the defensible number): EA=22.9%, MAE=7.11mm, r=-0.262 (see docs/VALIDATION_REPORT.md, docs/LIMITACIONES.md). | **In Progress** |
 | F4 | PyPI package, Docker image (GHCR), Streamlit Community Cloud deployment, MkDocs documentation site, peer-reviewed write-up. Colab/Drive notebook already available (`colab/BacterioScope_Colab.ipynb`) as an interim shareable deliverable. Streamlit demo now carries a permanent validation-status banner and rejects re-uploaded pipeline outputs (watermark check in `pipeline.analyze()`). | Planned |
 
 See docs/ROADMAP.md for full phase specifications.
@@ -88,7 +88,8 @@ bacterioscope/
             label_map.py            <- ROBOFLOW_TO_CLSI: disk abbreviation -> CLSI antibiotic key
             train.py                <- YOLOv8 training script (Phase 2)
         segmentation/
-            watershed.py             <- ZoneSegmenter: Otsu + contour fitting
+            watershed.py             <- ZoneSegmenter: Otsu + contour fitting, Voronoi-split
+                                        for confluent zones on multi-disk plates
         classification/
             clsi.py                  <- CLSIClassifier: CLSI M100-Ed33 2023 breakpoints
         evaluation/
@@ -187,10 +188,12 @@ pipeline.py: BacterioScopePipeline.analyze()
     |         If YOLO finds zero disks (or no weights) -> HoughCircles fallback automatically
     |         Returns: list[DiskResult] with center, radius, label, confidence
     |
-    +---> watershed.py: ZoneSegmenter.segment() (one call per disk)
-    |         Extract ROI -> grayscale -> Otsu threshold -> morphological cleanup
-    |         -> find contours -> measure diameter
-    |         Returns: ZoneResult with diameter_px, diameter_mm, circularity
+    +---> watershed.py: ZoneSegmenter.segment_all() (all disks jointly)
+    |         Per disk: extract ROI -> grayscale -> Otsu threshold -> morphological
+    |         cleanup -> restrict to this disk's Voronoi cell (nearest-neighbour
+    |         split against every other disk, so a confluent neighbour's zone
+    |         isn't measured as this disk's own) -> find contours -> measure diameter
+    |         Returns: list[ZoneResult] with diameter_px, diameter_mm, circularity
     |
     +---> clsi.py: CLSIClassifier.classify() (one call per disk)
     |         Look up antibiotic in CLSI 2023 breakpoint table

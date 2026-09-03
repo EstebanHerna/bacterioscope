@@ -26,9 +26,9 @@ Two strategies are reported, clearly separated below: **identity matching** (eac
 | Dataset | University of Zurich SIRscan (Egli et al., 2023) |
 | Reference system | SIRscan automated reader (EUCAST 2023) |
 | Total images evaluated | 80 |
-| Images with matching disk count | 70 |
-| Disk-antibiotic pairs used for EA | 1120 |
-| Images excluded (disk count mismatch or error) | 10 |
+| Images with matching disk count | 59 |
+| Disk-antibiotic pairs used for EA | 944 |
+| Images excluded (disk count mismatch or error) | 21 |
 
 ## Measurement accuracy
 
@@ -39,8 +39,8 @@ Each disk matched to its reference by antibiotic identity (human-verified from t
 | Metric | Value | Target |
 |---|---|---|
 | Essential Agreement (EA, +-2 mm) | **22.9%** | >= 90% |
-| Mean Absolute Error (MAE) | **7.18 mm** | — |
-| Pearson r | **-0.354** | — |
+| Mean Absolute Error (MAE) | **7.11 mm** | — |
+| Pearson r | **-0.262** | — |
 | Images identity-annotated | 3 |
 | Disk-antibiotic pairs (identity) | 48 |
 
@@ -52,19 +52,19 @@ Both diameter lists sorted ascending and paired by position. This does not verif
 
 | Metric | Value | Target | Criterion |
 |---|---|---|---|
-| Essential Agreement (EA, +-2 mm) | **26.9%** | >= 90% | ISO 20776-2 / EUCAST EDef 13.2 |
-| Mean Absolute Error (MAE) | **5.31 mm** | — | mm |
-| Pearson r | **0.579** | — | — |
+| Essential Agreement (EA, +-2 mm) | **27.4%** | >= 90% | ISO 20776-2 / EUCAST EDef 13.2 |
+| Mean Absolute Error (MAE) | **5.27 mm** | — | mm |
+| Pearson r | **0.603** | — | — |
 
 ### Bland-Altman limits of agreement (rank-order pairs)
 
 | Stat | Value |
 |---|---|
-| Bias (mean diff) | +3.16 mm |
-| SD of differences | 6.67 mm |
-| Upper LoA (+1.96 SD) | +16.22 mm |
-| Lower LoA (−1.96 SD) | -9.91 mm |
-| Pairs analysed | 1120 |
+| Bias (mean diff) | +3.00 mm |
+| SD of differences | 6.64 mm |
+| Upper LoA (+1.96 SD) | +16.02 mm |
+| Lower LoA (−1.96 SD) | -10.02 mm |
+| Pairs analysed | 944 |
 
 ### Definition of Essential Agreement used here
 
@@ -72,7 +72,17 @@ Classical EA (ISO 20776-2) is defined for MIC broth microdilution: the test-syst
 
 ## Diagnostic findings (this validation round)
 
-A first identity-matched validation pass surfaced a structural problem beyond calibration or detection: on real UZH plates (16 disks packed onto one 90mm plate with confluent, overlapping inhibition zones), measured zone diameters cluster tightly (stdev ~1.4-1.6mm) around ~27mm regardless of which antibiotic the disk carries. Real Kirby-Bauer results for 16 different drugs against one organism should vary far more (roughly 10-35mm) than that. The Otsu + watershed segmenter, tuned on isolated synthetic halos, is converging on a shared confluent boundary rather than each disk's own zone edge -- it measures the same thing 16 times, not 16 different biological responses. This is the leading suspect for why identity-matched Pearson r is near zero or negative even after the detection-radius and confidence-threshold fixes below: there is little real signal in the measurements to correlate against. Fixing this requires segmentation aware of neighbouring disks (e.g. a distance-transform watershed seeded from all detected disks at once, not an independent Otsu threshold per isolated ROI) -- not yet implemented.
+A first identity-matched validation pass surfaced a structural problem beyond calibration or detection: on real UZH plates (16 disks packed onto one 90mm plate with confluent, overlapping inhibition zones), measured zone diameters clustered tightly regardless of which antibiotic the disk carried -- the segmenter was measuring the same shared confluent blob for every disk, not 16 different biological responses.
+
+### What was tried on segmentation, and what actually worked
+
+`ZoneSegmenter.segment_all()` now segments every disk in the context of its neighbours rather than in isolation. Three approaches were attempted, in order:
+
+1. **Marker-based watershed flooding on the raw photo.** Standard textbook approach, but real-photo texture (agar surface, printed disk labels, JPEG noise) creates false local ridges everywhere, so flooding barely left each seed -- every zone collapsed to roughly the seed's own size. Discarded.
+2. **Watershed on a distance-transform elevation.** Removes the texture-noise problem, but on real (noisy, irregularly-shaped) masks the saddle points between confluent zones were themselves unreliable, and an edge disk with more open unclaimed territory could inherit a physically impossible region (one measurement hit 117mm on a 90mm plate). Discarded.
+3. **Voronoi partition: each pixel assigned to its geometrically nearest disk centre.** Deterministic, independent of image noise. **Verified correct on a controlled case**: two disks with deliberately different true zone sizes (80px and 40px radius, overlapping) were recovered as 40mm and 20mm respectively -- exact. This is the shipped implementation.
+
+The Voronoi split is real and tested (see `tests/test_watershed.py::TestSegmentAllVoronoiSplit`), but it did not meaningfully move the real-photo numbers below, and the reason is itself a finding, not an implementation gap: **for several adjacent disk pairs on the densest UZH plates, the raw pixel intensity between them is completely flat**, measured directly (no rise, no dip, ~70-90 vs ~70-90 across the entire gap between two specific disks checked by hand). When two zones are that fully confluent, there is no boundary left in the photograph for *any* algorithm to recover -- a human reading the same photo by eye faces exactly the same ambiguity. Voronoi still gives each disk a geometrically fair, bounded region instead of one shared blob reaching across the whole plate, which is real progress on plates with partial (not total) overlap; it cannot manufacture information a fully confluent photograph never captured.
 
 Two other fixes landed this round, with a measurable before/after:
 
@@ -85,25 +95,36 @@ What this means for the headline numbers: rank-order EA moved from 32.8% to 26.9
 
 ## Still unresolved
 
-- **Zone segmentation on confluent real plates** (above) -- the single largest suspected contributor to remaining error, not yet fixed.
+- **Zone segmentation on fully confluent real plates** (above). Voronoi splitting is implemented, tested, and verified correct when some boundary signal exists; it cannot help where the photograph itself has none. The 16-disk-dense UZH panel is a worst case for this -- a clinical panel with normal CLSI disk spacing (6-12 disks, properly separated) should confluence far less often, but this has not yet been measured directly.
 - **Identity-annotated sample is small** (3 images, 48 pairs). Needs 20-30 images (`scripts/annotate_pairs.py`) for a stable estimate; the current identity EA/MAE/r should be read as directional, not final.
 - **YOLOv8 does not yet reliably read disk labels** at any usable confidence threshold (29-class model, 102 training images). A single-class 'disk' detector trained on the same images reaches much higher mAP50 in early epochs (see Phase 2 status in docs/ROADMAP.md / CLAUDE.md) and can replace Hough for localisation, but disk *identity* still resolves through panel position, not label reading, until far more labelled data exists.
 - **EA is well below the ISO 20776-2 / EUCAST EDef 13.2 target of 90%** on both matching strategies. State plainly: BacterioScope does not yet meet the accuracy bar for real, unconstrained clinical photographs. It performs acceptably on synthetic and controlled images; real-photo accuracy is an open problem this report exists to make visible, not to paper over.
 
 ## Excluded images
 
-10 image(s) were excluded from EA: disk count mismatch between pipeline and reference, or pipeline error.
+21 image(s) were excluded from EA: disk count mismatch between pipeline and reference, or pipeline error.
 
+- 1.10.1. original.jpg — disk count mismatch
+- 1.5.1. original.jpg — disk count mismatch
+- 2.2.1. original.jpg — disk count mismatch
 - 2.8.1. original.jpg — disk count mismatch
+- 3.18.1. original.jpg — disk count mismatch
+- 3.3.1. original.jpg — disk count mismatch
 - 3.4.1. original.jpg — disk count mismatch
+- 4.22.1. original.jpg — disk count mismatch
 - 4.25.1. original.jpg — disk count mismatch
 - 4.26.1. original.jpg — disk count mismatch
 - 4.27.1. original.jpg — disk count mismatch
 - 4.29.1. original.jpg — disk count mismatch
 - 4.32.1. original.jpg — disk count mismatch
 - 4.33.1. original.jpg — disk count mismatch
+- 4.34.1. original.jpg — disk count mismatch
 - 4.38.1. original.jpg — disk count mismatch
+- 4.4.1. original.jpg — disk count mismatch
+- 4.40.1. original.jpg — disk count mismatch
+- 4.41.1. original.jpg — disk count mismatch
 - 4.42.1. original.jpg — disk count mismatch
+- ... and 1 more (see failed_images.log)
 
 ## Annotated examples
 

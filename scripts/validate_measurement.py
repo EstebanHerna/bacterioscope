@@ -496,20 +496,50 @@ def _write_report(
         "A first identity-matched validation pass surfaced a structural problem "
         "beyond calibration or detection: on real UZH plates (16 disks packed "
         "onto one 90mm plate with confluent, overlapping inhibition zones), "
-        "measured zone diameters cluster tightly (stdev ~1.4-1.6mm) around "
-        "~27mm regardless of which antibiotic the disk carries. Real Kirby-Bauer "
-        "results for 16 different drugs against one organism should vary far "
-        "more (roughly 10-35mm) than that. The Otsu + watershed segmenter, "
-        "tuned on isolated synthetic halos, is converging on a shared confluent "
-        "boundary rather than each disk's own zone edge -- it measures the same "
-        "thing 16 times, not 16 different biological responses. This is the "
-        "leading suspect for why identity-matched Pearson r is near zero or "
-        "negative even after the detection-radius and confidence-threshold "
-        "fixes below: there is little real signal in the measurements to "
-        "correlate against. Fixing this requires segmentation aware of "
-        "neighbouring disks (e.g. a distance-transform watershed seeded from "
-        "all detected disks at once, not an independent Otsu threshold per "
-        "isolated ROI) -- not yet implemented.",
+        "measured zone diameters clustered tightly regardless of which "
+        "antibiotic the disk carried -- the segmenter was measuring the same "
+        "shared confluent blob for every disk, not 16 different biological "
+        "responses.",
+        "",
+        "### What was tried on segmentation, and what actually worked",
+        "",
+        "`ZoneSegmenter.segment_all()` now segments every disk in the context "
+        "of its neighbours rather than in isolation. Three approaches were "
+        "attempted, in order:",
+        "",
+        "1. **Marker-based watershed flooding on the raw photo.** Standard "
+        "textbook approach, but real-photo texture (agar surface, printed "
+        "disk labels, JPEG noise) creates false local ridges everywhere, so "
+        "flooding barely left each seed -- every zone collapsed to roughly "
+        "the seed's own size. Discarded.",
+        "2. **Watershed on a distance-transform elevation.** Removes the "
+        "texture-noise problem, but on real (noisy, irregularly-shaped) "
+        "masks the saddle points between confluent zones were themselves "
+        "unreliable, and an edge disk with more open unclaimed territory "
+        "could inherit a physically impossible region (one measurement hit "
+        "117mm on a 90mm plate). Discarded.",
+        "3. **Voronoi partition: each pixel assigned to its geometrically "
+        "nearest disk centre.** Deterministic, independent of image noise. "
+        "**Verified correct on a controlled case**: two disks with "
+        "deliberately different true zone sizes (80px and 40px radius, "
+        "overlapping) were recovered as 40mm and 20mm respectively -- exact. "
+        "This is the shipped implementation.",
+        "",
+        "The Voronoi split is real and tested (see "
+        "`tests/test_watershed.py::TestSegmentAllVoronoiSplit`), but it did "
+        "not meaningfully move the real-photo numbers below, and the reason "
+        "is itself a finding, not an implementation gap: **for several "
+        "adjacent disk pairs on the densest UZH plates, the raw pixel "
+        "intensity between them is completely flat**, measured directly "
+        "(no rise, no dip, ~70-90 vs ~70-90 across the entire gap between "
+        "two specific disks checked by hand). When two zones are that fully "
+        "confluent, there is no boundary left in the photograph for *any* "
+        "algorithm to recover -- a human reading the same photo by eye faces "
+        "exactly the same ambiguity. Voronoi still gives each disk a "
+        "geometrically fair, bounded region instead of one shared blob "
+        "reaching across the whole plate, which is real progress on plates "
+        "with partial (not total) overlap; it cannot manufacture information "
+        "a fully confluent photograph never captured.",
         "",
         "Two other fixes landed this round, with a measurable before/after:",
         "",
@@ -537,8 +567,13 @@ def _write_report(
         "",
         "## Still unresolved",
         "",
-        "- **Zone segmentation on confluent real plates** (above) -- the "
-        "single largest suspected contributor to remaining error, not yet fixed.",
+        "- **Zone segmentation on fully confluent real plates** (above). "
+        "Voronoi splitting is implemented, tested, and verified correct when "
+        "some boundary signal exists; it cannot help where the photograph "
+        "itself has none. The 16-disk-dense UZH panel is a worst case for "
+        "this -- a clinical panel with normal CLSI disk spacing (6-12 disks, "
+        "properly separated) should confluence far less often, but this has "
+        "not yet been measured directly.",
         "- **Identity-annotated sample is small** (3 images, 48 pairs). Needs "
         "20-30 images (`scripts/annotate_pairs.py`) for a stable estimate; the "
         "current identity EA/MAE/r should be read as directional, not final.",
