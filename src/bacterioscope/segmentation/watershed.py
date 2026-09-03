@@ -103,9 +103,21 @@ class ZoneSegmenter:
     Attributes:
         margin_factor: How far beyond the disk radius (as a multiple of
             ``disk.radius_px``) to extend the search crop.  The default of
-            ``4.0`` means the ROI extends 4 × disk_radius pixels in each
-            direction, covering zones up to 8 × disk_radius in diameter.
-            Increase for plates with very large inhibition zones.
+            ``4.0`` is a deliberate compromise, not a tuned optimum: a
+            larger margin measures a real zone bigger than the crop as the
+            crop's own boundary rather than the zone's true edge (a known
+            27mm synthetic zone read as ~30mm at this default, matching the
+            crop diagonal), but a margin generous enough to stop clipping
+            large zones also starts reaching into a neighbour's zone on any
+            plate where disks are closer together than roughly twice this
+            radius -- verified empirically to make same-plate measurements
+            *more* erratic across several margin values on a 6-disk
+            synthetic layout, not less, because Otsu then thresholds a
+            merged bright region rather than one disk's own zone. Whether a
+            given plate favours clipping or bleeding is layout-dependent
+            with no single margin correct for both; this default was chosen
+            because it degrades to a stable, bounded result on dense
+            layouts rather than the erratic one wider margins produced.
         use_clahe: When ``True``, apply Contrast Limited Adaptive Histogram
             Equalization (CLAHE) to the grayscale ROI before Otsu thresholding.
             Improves performance on real plate photographs with uneven bench
@@ -157,6 +169,123 @@ class ZoneSegmenter:
             return self._no_zone(disk, px_per_mm)
 
         return self._build_zone_result(image, disk, best_contour, offset_x, offset_y, px_per_mm)
+
+    def segment_all(
+        self,
+        image: NDArray[np.uint8],
+        disks: list[DiskResult],
+        px_per_mm: float,
+    ) -> list[ZoneResult]:
+        """Measure inhibition zones for every disk on a plate jointly.
+
+        Uses exactly the same isolated-ROI Otsu thresholding as ``segment()``
+        (proven correct: measures known-27mm synthetic zones to within
+        ~3mm), with one addition -- before contour-picking, the ROI's binary
+        mask is restricted to this disk's own **Voronoi cell**: the region
+        geometrically closer to this disk's centre than to any other
+        detected disk. On an isolated disk this restriction changes nothing
+        (its own ROI never reaches a neighbour). On a plate with
+        closely-spaced or confluent disks, it stops the ROI from picking up
+        a neighbour's zone that has merged into this one -- the boundary
+        between two confluent zones falls on the perpendicular bisector
+        between their disk centres, independent of image noise (whole-plate
+        thresholding and intensity/distance-transform watershed were tried
+        first and discarded here: a plate-wide Otsu histogram gets dominated
+        by the much stronger plate-vs-background contrast rather than the
+        zone-vs-lawn contrast that matters, and gradient-based watershed
+        picks up agar texture and printed labels as false ridges).
+
+        Falls back to independent ``segment()`` calls when there are 0 or 1
+        disks, where confluence with a neighbour is not possible.
+
+        Args:
+            image: Full BGR plate image.
+            disks: All disks detected on this plate, in pipeline order.
+            px_per_mm: Calibration factor for pixel-to-mm conversion.
+
+        Returns:
+            List of ZoneResult objects, one per disk, in the same order as
+            ``disks``.
+        """
+        if len(disks) <= 1:
+            return [self.segment(image, d, px_per_mm) for d in disks]
+        return [
+            self._segment_within_voronoi_cell(image, disks, idx, px_per_mm)
+            for idx in range(len(disks))
+        ]
+
+    def _segment_within_voronoi_cell(
+        self,
+        image: NDArray[np.uint8],
+        disks: list[DiskResult],
+        idx: int,
+        px_per_mm: float,
+    ) -> ZoneResult:
+        """Segment one disk's own isolated ROI, restricted to its Voronoi cell.
+
+        Args:
+            image: Full BGR plate image.
+            disks: All disks on the plate (needed to compute the Voronoi
+                cell boundary against every neighbour, not just this disk).
+            idx: Index into ``disks`` of the disk being measured.
+            px_per_mm: Calibration factor for pixel-to-mm conversion.
+
+        Returns:
+            ZoneResult for ``disks[idx]``.
+        """
+        disk = disks[idx]
+        search_radius = int(disk.radius_px * self.margin_factor)
+        roi, offset_x, offset_y = self._extract_roi(image, disk, search_radius)
+
+        blurred = self._preprocess_roi(roi)
+        _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        binary = self._apply_morphology(binary)
+
+        local_disks = [
+            (d.center_x - offset_x, d.center_y - offset_y) for d in disks
+        ]
+        nearest = self._nearest_disk_map(local_disks, roi.shape[:2])
+        cell = (nearest == idx).astype(np.uint8) * 255
+        binary = cv2.bitwise_and(binary, cell)
+
+        contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return self._no_zone(disk, px_per_mm)
+
+        disk_local_x = disk.center_x - offset_x
+        disk_local_y = disk.center_y - offset_y
+        best_contour = self._find_zone_contour(contours, disk_local_x, disk_local_y)
+        if best_contour is None:
+            return self._no_zone(disk, px_per_mm)
+
+        return self._build_zone_result(image, disk, best_contour, offset_x, offset_y, px_per_mm)
+
+    def _nearest_disk_map(
+        self,
+        centers: list[tuple[int, int]],
+        shape: tuple[int, int],
+    ) -> NDArray[np.intp]:
+        """Assign every pixel to its geometrically nearest disk centre.
+
+        A Voronoi tessellation seeded at the given centres: pixel
+        ``(x, y)`` is assigned index ``i`` when ``centers[i]`` is the
+        closest of all centres to that pixel by Euclidean distance.
+
+        Args:
+            centers: ``(x, y)`` pixel coordinates of every disk centre, in
+                the same coordinate space as ``shape``.
+            shape: ``(height, width)`` of the image to build the map over.
+
+        Returns:
+            Integer array of shape ``shape`` where each entry is the index
+            into ``centers`` of the nearest centre to that pixel.
+        """
+        h, w = shape
+        yy, xx = np.mgrid[0:h, 0:w]
+        dist_sq_stack = np.stack([
+            (xx - cx) ** 2 + (yy - cy) ** 2 for cx, cy in centers
+        ])
+        return np.argmin(dist_sq_stack, axis=0)
 
     def _preprocess_roi(self, roi: NDArray[np.uint8]) -> NDArray[np.uint8]:
         """Convert ROI to grayscale, optionally apply CLAHE, then Gaussian blur.

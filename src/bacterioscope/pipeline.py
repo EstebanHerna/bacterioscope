@@ -448,7 +448,7 @@ class BacterioScopePipeline:
         Returns:
             List of ZoneResult objects in the same order as disks.
         """
-        return [self.segmenter.segment(image, disk, px_per_mm) for disk in disks]
+        return self.segmenter.segment_all(image, disks, px_per_mm)
 
     def _compute_flags(
         self,

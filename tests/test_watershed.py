@@ -91,3 +91,47 @@ class TestZoneSegmenter:
         disk = _disk_result(150, 150, 20)
         result = self.segmenter.segment(image, disk, px_per_mm=4.0)
         assert result.area_px >= 0.0
+
+
+class TestSegmentAllVoronoiSplit:
+    """segment_all() must recover each disk's own zone size when two
+    confluent zones of genuinely different sizes overlap, not average or
+    clip them to the same value -- see watershed.py::segment_all.
+    """
+    def setup_method(self) -> None:
+        self.segmenter = ZoneSegmenter()
+
+    def _overlapping_plate(self) -> np.ndarray:
+        """Two disks close enough that their zones overlap, sizes 80px vs 40px."""
+        image = np.full((400, 400, 3), 190, dtype=np.uint8)
+        cv2.circle(image, (150, 200), 80, (60, 60, 60), -1)
+        cv2.circle(image, (280, 200), 40, (60, 60, 60), -1)
+        cv2.circle(image, (150, 200), 12, (230, 230, 230), -1)
+        cv2.circle(image, (280, 200), 12, (230, 230, 230), -1)
+        return cv2.GaussianBlur(image, (9, 9), 3)
+
+    def test_recovers_different_sizes_for_overlapping_zones(self) -> None:
+        image = self._overlapping_plate()
+        big = _disk_result(150, 200, 12)
+        small = _disk_result(280, 200, 12)
+        results = self.segmenter.segment_all(image, [big, small], px_per_mm=4.0)
+        big_result, small_result = results
+        assert big_result.diameter_mm > small_result.diameter_mm + 10.0
+
+    def test_single_disk_falls_back_to_segment(self) -> None:
+        image = _plate_image()
+        disk = _disk_result(150, 150, 20)
+        via_all = self.segmenter.segment_all(image, [disk], px_per_mm=4.0)
+        via_single = self.segmenter.segment(image, disk, px_per_mm=4.0)
+        assert via_all[0].diameter_mm == via_single.diameter_mm
+
+    def test_empty_disk_list_returns_empty(self) -> None:
+        image = _plate_image()
+        assert self.segmenter.segment_all(image, [], px_per_mm=4.0) == []
+
+    def test_results_in_same_order_as_input(self) -> None:
+        image = self._overlapping_plate()
+        big = _disk_result(150, 200, 12)
+        small = _disk_result(280, 200, 12)
+        results = self.segmenter.segment_all(image, [small, big], px_per_mm=4.0)
+        assert results[0].diameter_mm < results[1].diameter_mm

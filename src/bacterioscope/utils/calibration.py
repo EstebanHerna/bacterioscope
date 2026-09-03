@@ -70,29 +70,20 @@ def calibrate_from_disk_radius_px(
     return (disk_radius_px * 2.0) / disk_diameter_mm
 
 
-def calibrate_px_per_mm(
-    image: NDArray[np.uint8],
-    plate_diameter_mm: float = 90.0,
-) -> tuple[float, float]:
-    """Detect the plate rim and compute the pixel-to-millimetre ratio.
+def detect_plate_circle(image: NDArray[np.uint8]) -> tuple[int, int, int] | None:
+    """Detect the plate rim via Hough Circle Transform.
 
-    Applies Gaussian blur to reduce noise, then runs the Hough Circle
-    Transform searching for a circle whose radius spans 25–50 % of the
-    shorter image dimension (appropriate for a plate that fills most of
-    the frame).  The largest detected circle is taken as the plate rim.
+    Applies Gaussian blur to reduce noise, then searches for a circle whose
+    radius spans 25-50% of the shorter image dimension (appropriate for a
+    plate that fills most of the frame). The largest detected circle is
+    taken as the plate rim.
 
     Args:
         image: Full BGR image array as returned by ``cv2.imread``.
-        plate_diameter_mm: Known physical diameter of the Petri dish in mm.
-            Standard Mueller-Hinton plates measure 90 mm.
 
     Returns:
-        A ``(plate_diameter_px, px_per_mm)`` tuple where:
-
-        - ``plate_diameter_px`` is the pixel-space diameter of the detected
-          plate (or the fallback estimate).
-        - ``px_per_mm`` is the calibration ratio used by the segmenter to
-          convert pixel measurements to millimetres.
+        ``(center_x, center_y, radius)`` in pixels, or ``None`` if no
+        circle was found.
     """
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (15, 15), 3)
@@ -116,11 +107,37 @@ def calibrate_px_per_mm(
         if circles is not None:
             break
 
-    if circles is not None:
-        circles = np.around(circles).astype(np.uint16)
-        largest = max(circles[0], key=lambda c: c[2])
-        plate_diameter_px = float(largest[2]) * 2
+    if circles is None:
+        return None
+    circles = np.around(circles).astype(np.uint16)
+    largest = max(circles[0], key=lambda c: c[2])
+    return int(largest[0]), int(largest[1]), int(largest[2])
+
+
+def calibrate_px_per_mm(
+    image: NDArray[np.uint8],
+    plate_diameter_mm: float = 90.0,
+) -> tuple[float, float]:
+    """Detect the plate rim and compute the pixel-to-millimetre ratio.
+
+    Args:
+        image: Full BGR image array as returned by ``cv2.imread``.
+        plate_diameter_mm: Known physical diameter of the Petri dish in mm.
+            Standard Mueller-Hinton plates measure 90 mm.
+
+    Returns:
+        A ``(plate_diameter_px, px_per_mm)`` tuple where:
+
+        - ``plate_diameter_px`` is the pixel-space diameter of the detected
+          plate (or the fallback estimate).
+        - ``px_per_mm`` is the calibration ratio used by the segmenter to
+          convert pixel measurements to millimetres.
+    """
+    circle = detect_plate_circle(image)
+    if circle is not None:
+        plate_diameter_px = float(circle[2]) * 2
     else:
+        h, w = image.shape[:2]
         plate_diameter_px = float(min(h, w)) * _PLATE_FALLBACK_FRACTION
 
     px_per_mm = plate_diameter_px / plate_diameter_mm
