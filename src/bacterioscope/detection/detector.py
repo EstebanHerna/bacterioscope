@@ -70,7 +70,17 @@ _HOUGH_MAX_RADIUS: int = 40
 # ceiling removes that degree of freedom.
 _DISK_RADIUS_MARGIN_LOW: float = 0.6
 _DISK_RADIUS_MARGIN_HIGH: float = 1.3
-_HOUGH_PARAM2_CALIBRATED: int = 45
+
+# No single param2 (Hough's accumulator threshold) works across both real photos
+# and synthetic test plates: real photos need ~45 (looser values pick up agar
+# texture as false circles), but synthetic plates' softer, blurred disk edges
+# fall below that threshold and lose real disks (measured: 5/6 or fewer detected
+# on every synthetic test plate at param2=45). Instead of picking one value,
+# sweep from strict to loose and use the count that holds stable across the
+# longest run of consecutive values -- real disks keep registering across a
+# wide param2 range, while noise circles only appear once the threshold drops
+# low enough, so the stable run is the real disk count in both regimes.
+_HOUGH_PARAM2_SWEEP: tuple[int, ...] = (50, 45, 40, 35, 30, 25, 20)
 
 
 @dataclass
@@ -244,17 +254,15 @@ class DiskDetector:
         """
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, _DISK_BLUR_KERNEL, 2)
-        min_radius, max_radius, param2 = self._hough_search_window(px_per_mm)
-        circles = cv2.HoughCircles(
-            blurred,
-            cv2.HOUGH_GRADIENT,
-            dp=_HOUGH_DP,
-            minDist=_HOUGH_MIN_DIST,
-            param1=_HOUGH_PARAM1,
-            param2=param2,
-            minRadius=min_radius,
-            maxRadius=max_radius,
-        )
+        min_radius, max_radius, calibrated = self._hough_search_window(px_per_mm)
+        if calibrated:
+            circles = self._hough_stable_circles(blurred, min_radius, max_radius)
+        else:
+            circles = cv2.HoughCircles(
+                blurred, cv2.HOUGH_GRADIENT, dp=_HOUGH_DP, minDist=_HOUGH_MIN_DIST,
+                param1=_HOUGH_PARAM1, param2=_HOUGH_PARAM2,
+                minRadius=min_radius, maxRadius=max_radius,
+            )
         disks: list[DiskResult] = []
         if circles is not None:
             circles = np.around(circles).astype(np.int32)
@@ -269,8 +277,8 @@ class DiskDetector:
                 ))
         return disks
 
-    def _hough_search_window(self, px_per_mm: float | None) -> tuple[int, int, int]:
-        """Return ``(min_radius, max_radius, param2)`` for the Hough search.
+    def _hough_search_window(self, px_per_mm: float | None) -> tuple[int, int, bool]:
+        """Return ``(min_radius, max_radius, calibrated)`` for the Hough search.
 
         With a known calibration, the window is centred on the physically
         expected disk radius (see module docstring for why a loose fixed
@@ -281,11 +289,62 @@ class DiskDetector:
             px_per_mm: Calibration factor, or ``None``.
 
         Returns:
-            Tuple of ``(min_radius, max_radius, param2)`` in pixels.
+            ``(min_radius, max_radius, calibrated)`` in pixels; ``calibrated``
+            indicates whether the tight, calibration-derived window was used.
         """
         if px_per_mm is None or px_per_mm <= 0:
-            return _HOUGH_MIN_RADIUS, _HOUGH_MAX_RADIUS, _HOUGH_PARAM2
+            return _HOUGH_MIN_RADIUS, _HOUGH_MAX_RADIUS, False
         expected_radius = (self.disk_diameter_mm / 2.0) * px_per_mm
         min_radius = max(3, int(expected_radius * _DISK_RADIUS_MARGIN_LOW))
         max_radius = max(min_radius + 1, int(expected_radius * _DISK_RADIUS_MARGIN_HIGH))
-        return min_radius, max_radius, _HOUGH_PARAM2_CALIBRATED
+        return min_radius, max_radius, True
+
+    def _hough_stable_circles(
+        self,
+        blurred: NDArray[np.uint8],
+        min_radius: int,
+        max_radius: int,
+    ) -> NDArray[np.float32] | None:
+        """Sweep Hough's accumulator threshold and return the stable-count result.
+
+        No single param2 works across real photos (need ~45 to reject agar
+        texture as false circles) and synthetic plates (softer edges drop
+        below that threshold, losing real disks). Sweeping strict-to-loose and
+        taking the circle count that holds across the longest run of
+        consecutive thresholds finds the real disk count in both regimes:
+        real disks keep registering across a wide param2 range, while false
+        circles only appear once the threshold drops low enough to admit them.
+
+        Args:
+            blurred: Grayscale, Gaussian-blurred plate image.
+            min_radius: Minimum circle radius in pixels.
+            max_radius: Maximum circle radius in pixels.
+
+        Returns:
+            The ``cv2.HoughCircles`` output array for the stable run (the
+            strictest param2 within it), or ``None`` if every attempt found
+            zero circles.
+        """
+        best_run_len = 0
+        best_circles: NDArray[np.float32] | None = None
+        prev_count = -1
+        prev_circles: NDArray[np.float32] | None = None
+        run_len = 0
+        run_start_circles: NDArray[np.float32] | None = None
+        for param2 in _HOUGH_PARAM2_SWEEP:
+            circles = cv2.HoughCircles(
+                blurred, cv2.HOUGH_GRADIENT, dp=_HOUGH_DP, minDist=_HOUGH_MIN_DIST,
+                param1=_HOUGH_PARAM1, param2=param2,
+                minRadius=min_radius, maxRadius=max_radius,
+            )
+            count = 0 if circles is None else len(circles[0])
+            if count > 0 and count == prev_count:
+                run_len += 1
+            else:
+                run_len = 1
+                run_start_circles = circles
+            if count > 0 and run_len > best_run_len:
+                best_run_len = run_len
+                best_circles = run_start_circles
+            prev_count, prev_circles = count, circles
+        return best_circles if best_circles is not None else prev_circles

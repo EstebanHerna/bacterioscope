@@ -88,6 +88,35 @@ class TestDiskDetectorHoughMode:
             assert 10 <= disk.radius_px <= 40
 
 
+class TestHoughStableParam2Sweep:
+    """Regression: a single fixed param2 cannot serve both real photos (need
+    a strict threshold to reject agar texture as false circles) and synthetic
+    plates (softer, blurred disk edges drop below that threshold). See
+    detector.py::_hough_stable_circles.
+    """
+    def setup_method(self) -> None:
+        self.detector = _make_detector()
+
+    def test_committed_synthetic_plates_detect_all_six_disks(self) -> None:
+        examples_dir = Path(__file__).parent.parent / "examples" / "synthetic"
+        px_per_mm = 540 / (90 * 1.14)
+        for name in (
+            "plate_pan_susceptible", "plate_mixed_sir", "plate_mdr_organism",
+            "plate_large_zones", "plate_esbl_like",
+        ):
+            path = examples_dir / f"{name}.png"
+            image = cv2.imread(str(path))
+            assert image is not None, f"Missing fixture: {path}"
+            disks = self.detector.detect(image, px_per_mm=px_per_mm)
+            assert len(disks) == 6, f"{name}: expected 6 disks, got {len(disks)}"
+
+    def test_calibrated_path_still_finds_disks_on_synthetic_helper(self) -> None:
+        plate = _make_synthetic_plate()
+        px_per_mm = 540 / (90 * 1.14)
+        disks = self.detector.detect(plate, px_per_mm=px_per_mm)
+        assert len(disks) == 6
+
+
 class TestLabelMap:
     def test_known_classes_map_to_clsi_keys(self) -> None:
         assert ROBOFLOW_TO_CLSI["CIP 10"] == "ciprofloxacin"
