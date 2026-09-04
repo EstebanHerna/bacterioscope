@@ -43,6 +43,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from bacterioscope.detection.detector import DiskDetector  # noqa: E402
 from bacterioscope.utils.calibration import calibrate_px_per_mm  # noqa: E402
 from bacterioscope.utils.image import resize_canonical  # noqa: E402
+from bacterioscope.utils.visualization import stamp_watermark  # noqa: E402
 
 _FONT = cv2.FONT_HERSHEY_SIMPLEX
 _LABEL_COLOR = (60, 220, 60)
@@ -81,6 +82,20 @@ def _annotate_numbered(image, disks) -> None:
             image, str(i), (disk.center_x - 8, disk.center_y + 8),
             _FONT, 0.9, _LABEL_COLOR, 2, cv2.LINE_AA,
         )
+    stamp_watermark(image)
+
+
+def _has_filled_codes(pairs_path: Path) -> bool:
+    """Return True if an existing pairs CSV already has any antibiotic_code filled in.
+
+    Re-running this script on the same image must never silently discard
+    hand-verified identity pairs -- happened once already: a batch re-run
+    overwrote two already-annotated CSVs with blank templates.
+    """
+    if not pairs_path.is_file():
+        return False
+    with pairs_path.open(newline="", encoding="utf-8") as fh:
+        return any(row["antibiotic_code"].strip() for row in csv.DictReader(fh))
 
 
 def _write_pairs_template(disks, px_per_mm: float, out_path: Path) -> None:
@@ -115,7 +130,10 @@ def process_image(
     cv2.imwrite(str(numbered_path), numbered)
 
     pairs_path = output_dir / f"{image_path.stem}_pairs.csv"
-    _write_pairs_template(disks, px_per_mm, pairs_path)
+    if _has_filled_codes(pairs_path):
+        print(f"  {image_path.name}: keeping existing filled-in {pairs_path.name}")
+    else:
+        _write_pairs_template(disks, px_per_mm, pairs_path)
 
     reference = _load_reference_antibiotics(ground_truth_csv, image_path.name)
     print(f"  {image_path.name}: {len(disks)} disks detected -> {numbered_path.name}")

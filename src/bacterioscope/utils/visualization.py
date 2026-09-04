@@ -140,15 +140,19 @@ def draw_results(
             cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1, cv2.LINE_AA,
         )
 
-    _stamp_watermark(image)
+    stamp_watermark(image)
     return image
 
 
-def _stamp_watermark(image: NDArray[np.uint8]) -> None:
+def stamp_watermark(image: NDArray[np.uint8]) -> None:
     """Stamp a solid marker block in the top-left corner, in place.
 
     Marks this image as BacterioScope output so ``has_watermark()`` can
-    reject it if it is later re-uploaded as if it were a fresh photo.
+    reject it if it is later re-uploaded as if it were a fresh photo. Call
+    this on any image saved for a human to look at that draws detection
+    results onto a copy of an input photo -- not just ``draw_results()``'s
+    own output (e.g. ``scripts/annotate_pairs.py``'s numbered disk overlay
+    is exactly this kind of image and must be stamped too).
     """
     size = min(WATERMARK_SIZE_PX, image.shape[0], image.shape[1])
     if size > 0:
