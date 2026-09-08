@@ -57,6 +57,13 @@ _OPEN_ITERS: int = 1
 _CLAHE_CLIP_LIMIT: float = 2.0
 _CLAHE_TILE_SIZE: tuple[int, int] = (8, 8)
 
+# CLSI zone diameters reported in clinical practice essentially never exceed
+# this, even for the most susceptible organism-antibiotic combinations. Used
+# as a hard ceiling on the search crop so a sparse plate (no nearby disk to
+# cap against) cannot grow the ROI past the point where Otsu starts picking
+# up the petri dish rim or background instead of the true zone edge.
+_MAX_PLAUSIBLE_ZONE_RADIUS_MM: float = 15.0
+
 
 @dataclass
 class ZoneResult:
@@ -102,22 +109,26 @@ class ZoneSegmenter:
 
     Attributes:
         margin_factor: How far beyond the disk radius (as a multiple of
-            ``disk.radius_px``) to extend the search crop.  The default of
-            ``4.0`` is a deliberate compromise, not a tuned optimum: a
-            larger margin measures a real zone bigger than the crop as the
-            crop's own boundary rather than the zone's true edge (a known
-            27mm synthetic zone read as ~30mm at this default, matching the
-            crop diagonal), but a margin generous enough to stop clipping
-            large zones also starts reaching into a neighbour's zone on any
-            plate where disks are closer together than roughly twice this
-            radius -- verified empirically to make same-plate measurements
-            *more* erratic across several margin values on a 6-disk
-            synthetic layout, not less, because Otsu then thresholds a
-            merged bright region rather than one disk's own zone. Whether a
-            given plate favours clipping or bleeding is layout-dependent
-            with no single margin correct for both; this default was chosen
-            because it degrades to a stable, bounded result on dense
-            layouts rather than the erratic one wider margins produced.
+            ``disk.radius_px``) the search crop extends, before the two caps
+            in ``_search_radius()`` apply (nearest-neighbour distance, and
+            an absolute plausible-zone-size ceiling). ``4.0`` is a
+            deliberate compromise, not a tuned optimum: raising it to give
+            large real zones more room was tried and measured directly on
+            real photos -- it does not fix them. Every disk's zone mask
+            already fills 100% of its crop's bounding box at ``4.0``
+            (confirmed on real UZH photos, including sparse 4-disk plates
+            with no nearby neighbour to blame), and raising the factor to
+            5.0-8.0 does not shrink that fill ratio -- Otsu keeps marking
+            the entire crop as zone regardless of crop size on these
+            specific images, then ``cv2.minEnclosingCircle`` on a
+            fully-filled square reports an even larger, more implausible
+            diameter (confirmed: some real photos jumped to 45-50mm on a
+            physically ~90mm plate). This means the failure on these images
+            is Otsu not finding a true zone-vs-lawn boundary at all, not a
+            crop that is merely too small -- a deeper problem than crop
+            size, not fixed by this class. ``4.0`` was kept because it
+            bounds the resulting error to a smaller number when Otsu fails,
+            rather than a larger one.
         use_clahe: When ``True``, apply Contrast Limited Adaptive Histogram
             Equalization (CLAHE) to the grayscale ROI before Otsu thresholding.
             Improves performance on real plate photographs with uneven bench
@@ -128,6 +139,50 @@ class ZoneSegmenter:
         self.margin_factor = margin_factor
         self.use_clahe = use_clahe
         self._clahe = cv2.createCLAHE(clipLimit=_CLAHE_CLIP_LIMIT, tileGridSize=_CLAHE_TILE_SIZE)
+
+    def _search_radius(
+        self,
+        disk: DiskResult,
+        px_per_mm: float,
+        neighbors: Sequence[DiskResult] = (),
+    ) -> int:
+        """Compute the ROI half-size for one disk, geometrically bounded.
+
+        Two independent, defensive caps on ``margin_factor * disk.radius_px``:
+        never reach past half the distance to the nearest other disk centre
+        (so a larger margin_factor, if ever raised, cannot bleed into a
+        neighbour's zone), and never exceed ``_MAX_PLAUSIBLE_ZONE_RADIUS_MM``
+        converted to pixels (so it cannot grow large enough for Otsu to pick
+        up the petri dish rim or background instead of a zone edge -- this
+        was directly observed on real 4-disk, widely-spaced plates once
+        raised past this size, where measured diameters jumped to 45-50mm on
+        what is physically a ~90mm plate). At the current default
+        ``margin_factor=4.0`` neither cap binds on any image tested; both
+        exist as guardrails for if/when a future fix increases the base
+        margin again -- raising it alone was tried and did not fix the
+        underlying issue (see ``margin_factor`` docstring above).
+
+        Args:
+            disk: The disk being measured.
+            px_per_mm: Calibration factor, used to convert the absolute
+                plausible-zone-size cap from millimetres to pixels.
+            neighbors: Every other disk on the same plate (excluding
+                ``disk`` itself). Pass an empty sequence for a single
+                isolated disk.
+
+        Returns:
+            Half-width of the square ROI to crop, in pixels.
+        """
+        uncapped = disk.radius_px * self.margin_factor
+        absolute_cap = _MAX_PLAUSIBLE_ZONE_RADIUS_MM * px_per_mm
+        capped = min(uncapped, absolute_cap)
+        if not neighbors:
+            return int(capped)
+        nearest_dist = min(
+            np.hypot(disk.center_x - n.center_x, disk.center_y - n.center_y)
+            for n in neighbors
+        )
+        return int(min(capped, max(nearest_dist / 2, disk.radius_px)))
 
     def segment(
         self,
@@ -151,7 +206,7 @@ class ZoneSegmenter:
             organism with no inhibition), returns a ``ZoneResult`` with all
             numerical fields set to zero.
         """
-        search_radius = int(disk.radius_px * self.margin_factor)
+        search_radius = self._search_radius(disk, px_per_mm)
         roi, offset_x, offset_y = self._extract_roi(image, disk, search_radius)
 
         blurred = self._preprocess_roi(roi)
@@ -234,7 +289,8 @@ class ZoneSegmenter:
             ZoneResult for ``disks[idx]``.
         """
         disk = disks[idx]
-        search_radius = int(disk.radius_px * self.margin_factor)
+        neighbors = [d for i, d in enumerate(disks) if i != idx]
+        search_radius = self._search_radius(disk, px_per_mm, neighbors)
         roi, offset_x, offset_y = self._extract_roi(image, disk, search_radius)
 
         blurred = self._preprocess_roi(roi)
