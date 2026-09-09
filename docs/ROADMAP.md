@@ -37,7 +37,13 @@ Establish a working end-to-end pipeline from raw plate photograph to S/I/R repor
 
 ## Phase 1 — Dataset curation and annotation
 
-**Status: Planned**
+**Status: In Progress.** See the F1 row in `CLAUDE.md` for the current, authoritative
+status and numbers -- this section is the original task-level spec, kept for reference;
+it does not track day-to-day progress. Ground truth (3598 measurements from 225
+per-isolate DOCX tables, not the summary XLSX) is parsed and complete. 20 images have
+human-verified disk-to-antibiotic identity pairing (`data/processed/pair_annotations/`),
+reaching the sample size needed for a stable identity-matched accuracy estimate.
+Train/val/test split for YOLO annotation is still pending.
 
 ### Goal
 
@@ -68,7 +74,19 @@ Download: `python scripts/download_data.py`
 
 ## Phase 2 — YOLOv8 training: disk detection and antibiotic label reading
 
-**Status: Planned**
+**Status: In Progress.** See the F2 row in `CLAUDE.md` for current, authoritative status
+and numbers. The architecture decision below (one class per antibiotic, reading the
+label directly) was tried and did not reach a usable state: 29-class YOLOv8n on 102
+Roboflow images scored mAP50=0.096, an experiment result, not a usable detector at any
+defensible confidence threshold. The project pivoted to the single-class approach
+described in `CLAUDE.md`'s "Key design decisions" and F2 row: one "disk" class for
+localization, identity resolved by panel position (`panels/manager.py`) instead of
+per-disk label reading. That single-class model trained cleanly (mAP50=0.995 on its own
+held-out Roboflow split) but, measured directly against real UZH photos, does not yet
+outperform the existing Hough-based localization -- a real domain-gap finding, not a
+training bug. Full automated label reading (this phase's original goal) remains
+unimplemented; the acceptance criteria below describe the original per-antibiotic-class
+target, not the current single-class architecture.
 
 ### Goal
 
