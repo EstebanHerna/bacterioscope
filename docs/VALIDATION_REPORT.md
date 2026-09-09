@@ -38,11 +38,11 @@ Each disk matched to its reference by antibiotic identity (human-verified from t
 
 | Metric | Value | Target |
 |---|---|---|
-| Essential Agreement (EA, +-2 mm) | **22.9%** | >= 90% |
-| Mean Absolute Error (MAE) | **7.11 mm** | — |
-| Pearson r | **-0.262** | — |
-| Images identity-annotated | 3 |
-| Disk-antibiotic pairs (identity) | 48 |
+| Essential Agreement (EA, +-2 mm) | **24.1%** | >= 90% |
+| Mean Absolute Error (MAE) | **7.44 mm** | — |
+| Pearson r | **0.089** | — |
+| Images identity-annotated | 20 |
+| Disk-antibiotic pairs (identity) | 316 |
 
 Annotate more images with `python scripts/annotate_pairs.py --batch data/raw/dryad_uzh/images_original --limit N` to grow this sample; 20-30 images gives a reasonably stable estimate.
 
@@ -52,18 +52,18 @@ Both diameter lists sorted ascending and paired by position. This does not verif
 
 | Metric | Value | Target | Criterion |
 |---|---|---|---|
-| Essential Agreement (EA, +-2 mm) | **27.4%** | >= 90% | ISO 20776-2 / EUCAST EDef 13.2 |
+| Essential Agreement (EA, +-2 mm) | **27.3%** | >= 90% | ISO 20776-2 / EUCAST EDef 13.2 |
 | Mean Absolute Error (MAE) | **5.27 mm** | — | mm |
-| Pearson r | **0.603** | — | — |
+| Pearson r | **0.608** | — | — |
 
 ### Bland-Altman limits of agreement (rank-order pairs)
 
 | Stat | Value |
 |---|---|
-| Bias (mean diff) | +3.00 mm |
-| SD of differences | 6.64 mm |
-| Upper LoA (+1.96 SD) | +16.02 mm |
-| Lower LoA (−1.96 SD) | -10.02 mm |
+| Bias (mean diff) | +2.99 mm |
+| SD of differences | 6.65 mm |
+| Upper LoA (+1.96 SD) | +16.03 mm |
+| Lower LoA (−1.96 SD) | -10.05 mm |
 | Pairs analysed | 944 |
 
 ### Definition of Essential Agreement used here
@@ -96,7 +96,7 @@ What this means for the headline numbers: rank-order EA moved from 32.8% to 26.9
 ## Still unresolved
 
 - **Zone segmentation on fully confluent real plates** (above). Voronoi splitting is implemented, tested, and verified correct when some boundary signal exists; it cannot help where the photograph itself has none. The 16-disk-dense UZH panel is a worst case for this -- a clinical panel with normal CLSI disk spacing (6-12 disks, properly separated) should confluence far less often, but this has not yet been measured directly.
-- **Identity-annotated sample is small** (3 images, 48 pairs). Needs 20-30 images (`scripts/annotate_pairs.py`) for a stable estimate; the current identity EA/MAE/r should be read as directional, not final.
+- **Identity-annotated sample grew from 3 to 20 images** (48 to 316 pairs), reaching the stable-estimate range this file itself called for. The larger sample changed Pearson r from -0.262 to +0.089 -- the earlier negative correlation was small-sample noise, not a real effect -- while EA and MAE held roughly steady (22.9%->24.1%, 7.11mm->7.44mm), confirming those two numbers reflect a real measurement limitation rather than an artifact of a tiny sample. The position-to-antibiotic mapping used to identity-annotate the 17 new images was derived from the fixed panel template shared by the first 3 (verified by direct visual reading of the printed disk labels on several images per template variant before applying it), not re-read label by label on every image -- documented here so the provenance is explicit.
 - **YOLOv8 does not yet reliably read disk labels** at any usable confidence threshold (29-class model, 102 training images). A single-class 'disk' detector trained on the same images reaches much higher mAP50 in early epochs (see Phase 2 status in docs/ROADMAP.md / CLAUDE.md) and can replace Hough for localisation, but disk *identity* still resolves through panel position, not label reading, until far more labelled data exists.
 - **EA is well below the ISO 20776-2 / EUCAST EDef 13.2 target of 90%** on both matching strategies. State plainly: BacterioScope does not yet meet the accuracy bar for real, unconstrained clinical photographs. It performs acceptably on synthetic and controlled images; real-photo accuracy is an open problem this report exists to make visible, not to paper over.
 

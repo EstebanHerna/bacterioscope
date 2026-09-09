@@ -574,9 +574,19 @@ def _write_report(
         "this -- a clinical panel with normal CLSI disk spacing (6-12 disks, "
         "properly separated) should confluence far less often, but this has "
         "not yet been measured directly.",
-        "- **Identity-annotated sample is small** (3 images, 48 pairs). Needs "
-        "20-30 images (`scripts/annotate_pairs.py`) for a stable estimate; the "
-        "current identity EA/MAE/r should be read as directional, not final.",
+        "- **Identity-annotated sample grew from 3 to 20 images** (48 to 316 "
+        "pairs), reaching the stable-estimate range this file itself called "
+        "for. The larger sample changed Pearson r from -0.262 to +0.089 -- "
+        "the earlier negative correlation was small-sample noise, not a real "
+        "effect -- while EA and MAE held roughly steady (22.9%->24.1%, "
+        "7.11mm->7.44mm), confirming those two numbers reflect a real "
+        "measurement limitation rather than an artifact of a tiny sample. "
+        "The position-to-antibiotic mapping used to identity-annotate the "
+        "17 new images was derived from the fixed panel template shared by "
+        "the first 3 (verified by direct visual reading of the printed disk "
+        "labels on several images per template variant before applying it), "
+        "not re-read label by label on every image -- documented here so the "
+        "provenance is explicit.",
         "- **YOLOv8 does not yet reliably read disk labels** at any usable "
         "confidence threshold (29-class model, 102 training images). A "
         "single-class 'disk' detector trained on the same images reaches "

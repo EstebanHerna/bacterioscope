@@ -112,11 +112,11 @@ by the SIRscan automated reader under EUCAST 2023 breakpoints.
 
 ### Measurement accuracy (80-image real-photo subset)
 
-| Metric | Identity-matched (3 images, 48 pairs) | Rank-order (59 images, 943 pairs) | Target |
+| Metric | Identity-matched (20 images, 316 pairs) | Rank-order (59 images, 943 pairs) | Target |
 |---|---|---|---|
-| Essential Agreement (EA, ±2 mm) | 22.9% | 27.4% | ≥ 90% |
-| Mean Absolute Error (MAE, mm) | 7.11 mm | 5.27 mm | — |
-| Pearson r | -0.262 | 0.603 | — |
+| Essential Agreement (EA, ±2 mm) | 24.1% | 27.3% | ≥ 90% |
+| Mean Absolute Error (MAE, mm) | 7.44 mm | 5.27 mm | — |
+| Pearson r | 0.089 | 0.608 | — |
 
 **BacterioScope does not yet meet the ISO 20776-2 / EUCAST target on real, unconstrained
 clinical photographs.** Identity matching (each disk paired to its reference by the

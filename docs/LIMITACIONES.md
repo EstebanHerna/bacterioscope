@@ -80,6 +80,28 @@ human reading the same photo by eye faces the identical ambiguity. This
 practice (6-12 disks with normal CLSI spacing); whether ordinary clinical
 panels confluence this severely has not yet been measured directly.
 
+A related, distinct problem was found and confirmed directly: at the
+default ROI crop size, most real UZH photos have Otsu marking essentially
+the entire search crop as "zone" for most disks, not the real zone-vs-lawn
+boundary -- even on sparse, widely-spaced 4-disk plates with no neighbour
+nearby, ruling out confluence as the cause. Growing the crop was tried and
+tested directly: it does not fix this. Otsu keeps marking the whole (larger)
+crop as zone regardless of its size on these images, and the resulting
+measurement gets worse, not better (some real photos jumped to 45-50mm on a
+physically ~90mm plate). `ZoneSegmenter._search_radius()` now applies two
+geometric safety caps (nearest-neighbour distance, and an absolute
+plausible-zone-size ceiling) so this cannot happen unboundedly, but the
+underlying cause -- Otsu failing to find a true boundary on many real
+photographs -- remains unresolved.
+
+The identity-matched validation sample grew from 3 to 20 images (48 to 316
+disk-antibiotic pairs) this round, reaching the range this document
+previously said was needed for a stable estimate. The larger sample
+resolved an artifact of the earlier tiny sample (Pearson r moved from
+-0.262 to +0.089 -- a real near-zero correlation, not the earlier
+small-sample noise) while confirming EA and MAE as real, not noise
+(22.9%->24.1%, 7.11mm->7.44mm across the two sample sizes).
+
 ---
 
 ## 4. Tool for support — confirmation by a qualified professional is required
