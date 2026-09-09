@@ -208,17 +208,34 @@ class DiskDetector:
         return self._detect_hough(image, px_per_mm)
 
     def _detect_yolo(self, image: NDArray[np.uint8]) -> list[DiskResult]:
-        """Run YOLOv8 inference and convert results to DiskResult objects."""
+        """Run YOLOv8 inference and convert results to DiskResult objects.
+
+        A 29-class model names each detection by the antibiotic it read off
+        the disk, so that class name becomes the label directly. A
+        single-class 'disk' detector (Phase 2's higher-mAP replacement for
+        Hough localisation) has no such identity to report -- every
+        detection shares the same class name, and passing that name straight
+        through would give every disk on the plate the identical label
+        'disk', colliding in the CLSI lookup, the UI table, and everywhere
+        else a unique per-disk identifier is assumed. Number sequentially
+        instead ('disk_0', 'disk_1', ...), matching the Hough fallback's own
+        convention -- identity then resolves through panel position
+        (PanelManager) exactly as it does for Hough detections today.
+        """
         results = self._model(image, conf=self.confidence, verbose=False)
+        single_class = len(self._model.names) == 1
         disks: list[DiskResult] = []
         for r in results:
-            for box in r.boxes:
+            for i, box in enumerate(r.boxes):
                 x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
                 cx = (x1 + x2) // 2
                 cy = (y1 + y2) // 2
                 radius = max(x2 - x1, y2 - y1) // 2
-                raw_label = r.names[int(box.cls[0])]
-                label = ROBOFLOW_TO_CLSI.get(raw_label, raw_label)
+                if single_class:
+                    label = f"disk_{i}"
+                else:
+                    raw_label = r.names[int(box.cls[0])]
+                    label = ROBOFLOW_TO_CLSI.get(raw_label, raw_label)
                 disks.append(DiskResult(
                     label=label,
                     center_x=cx,

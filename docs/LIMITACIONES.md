@@ -37,10 +37,22 @@ model (102 training images, ~3.5 examples per class) does not reach a usable
 confidence level -- `confidence_threshold` is deliberately kept at a defensible
 0.25 floor rather than lowered to force detections out of an undertrained
 model. A single-class "disk" detector (collapsing all 29 antibiotic classes to
-one "disk" label, letting panel position resolve identity instead) reaches
-much higher mAP50 on the same 102 images and is the current best replacement
-for Hough-based localisation; it does not, by itself, remove the manual
-assignment step.
+one "disk" label, letting panel position resolve identity instead) finished
+training and reaches mAP50=0.995 on its own held-out Roboflow test split --
+but does not, by itself, remove the manual assignment step, and is **not**
+a proven replacement for Hough-based localisation despite that score.
+Measured directly against the 80 real UZH photos this project validates
+against (expected disk count taken from the DOCX-derived ground truth,
+independent of either detector): Hough matches the true disk count on
+73.8% of images versus 60.0% for the single-class YOLO model. The
+Roboflow training set (102 images) does not resemble the UZH photography
+protocol closely enough for the model to generalise as well as its own
+test-split score suggests. It remains available for anyone who wants to
+use it (`PipelineConfig(detector_weights=Path("data/models/single_class/
+yolov8_disks.pt"))`), with a real labelling bug fixed this round (every
+detection previously shared the literal class name `'disk'`, now numbered
+`disk_0`, `disk_1`, ... to match Hough), but the pipeline's default stays
+on Hough until a domain-matched training set closes this gap.
 
 ---
 

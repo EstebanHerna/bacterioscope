@@ -148,6 +148,63 @@ class TestLabelMap:
         assert ROBOFLOW_TO_CLSI.get("VA 30", "VA 30") == "VA 30"
 
 
+class _FakeBox:
+    def __init__(self, xyxy: tuple[int, int, int, int], cls_idx: int, conf: float) -> None:
+        self._xyxy = xyxy
+        self._cls = cls_idx
+        self._conf = conf
+
+    @property
+    def xyxy(self) -> list[np.ndarray]:
+        return [np.array(self._xyxy, dtype=np.float32)]
+
+    @property
+    def cls(self) -> list[np.ndarray]:
+        return [np.array(self._cls, dtype=np.float32)]
+
+    @property
+    def conf(self) -> list[np.ndarray]:
+        return [np.array(self._conf, dtype=np.float32)]
+
+
+class _FakeYoloResult:
+    def __init__(self, boxes: list[_FakeBox], names: dict[int, str]) -> None:
+        self.boxes = boxes
+        self.names = names
+
+
+class _FakeYoloModel:
+    """Stand-in for a loaded YOLO model, avoiding a real ultralytics/torch dependency in tests."""
+
+    def __init__(self, names: dict[int, str], boxes: list[_FakeBox]) -> None:
+        self.names = names
+        self._boxes = boxes
+
+    def __call__(self, image: np.ndarray, conf: float, verbose: bool) -> list[_FakeYoloResult]:
+        return [_FakeYoloResult(self._boxes, self.names)]
+
+
+class TestDiskDetectorYoloLabeling:
+    def test_single_class_model_numbers_disks_sequentially(self) -> None:
+        boxes = [_FakeBox((10, 10, 30, 30), 0, 0.9) for _ in range(3)]
+        detector = _make_detector()
+        detector._model = _FakeYoloModel(names={0: "disk"}, boxes=boxes)
+
+        disks = detector.detect(_blank_image())
+
+        assert [d.label for d in disks] == ["disk_0", "disk_1", "disk_2"]
+        assert len(set(d.label for d in disks)) == 3
+
+    def test_multi_class_model_maps_labels_via_roboflow_to_clsi(self) -> None:
+        boxes = [_FakeBox((10, 10, 30, 30), 0, 0.9), _FakeBox((50, 50, 70, 70), 1, 0.9)]
+        detector = _make_detector()
+        detector._model = _FakeYoloModel(names={0: "CIP 10", 1: "MEM 10"}, boxes=boxes)
+
+        disks = detector.detect(_blank_image())
+
+        assert [d.label for d in disks] == ["ciprofloxacin", "meropenem"]
+
+
 def _make_synthetic_plate(size: int = 540) -> np.ndarray:
     center = (size // 2, size // 2)
     plate_r = 252
