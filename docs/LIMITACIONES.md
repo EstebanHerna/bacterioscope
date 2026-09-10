@@ -92,19 +92,34 @@ human reading the same photo by eye faces the identical ambiguity. This
 practice (6-12 disks with normal CLSI spacing); whether ordinary clinical
 panels confluence this severely has not yet been measured directly.
 
-A related, distinct problem was found and confirmed directly: at the
-default ROI crop size, most real UZH photos have Otsu marking essentially
+A related, distinct problem was found, root-caused, and fixed: at the
+default ROI crop size, most real UZH photos had Otsu marking essentially
 the entire search crop as "zone" for most disks, not the real zone-vs-lawn
 boundary -- even on sparse, widely-spaced 4-disk plates with no neighbour
-nearby, ruling out confluence as the cause. Growing the crop was tried and
-tested directly: it does not fix this. Otsu keeps marking the whole (larger)
-crop as zone regardless of its size on these images, and the resulting
-measurement gets worse, not better (some real photos jumped to 45-50mm on a
-physically ~90mm plate). `ZoneSegmenter._search_radius()` now applies two
+nearby, ruling out confluence as the cause. Growing the crop was tried
+first and tested directly: it did not fix this -- Otsu kept marking the
+whole (larger) crop as zone regardless of size, and the resulting
+measurement got worse, not better (some real photos jumped to 45-50mm on a
+physically ~90mm plate). `ZoneSegmenter._search_radius()` applies two
 geometric safety caps (nearest-neighbour distance, and an absolute
-plausible-zone-size ceiling) so this cannot happen unboundedly, but the
-underlying cause -- Otsu failing to find a true boundary on many real
-photographs -- remains unresolved.
+plausible-zone-size ceiling) so this cannot happen unboundedly, but a crop
+size change alone never addressed the underlying cause.
+
+Direct pixel measurement found the real cause: the paper disk itself
+(bright, ~150-200) is almost always a far stronger bright/dark signal than
+the actual zone-vs-lawn contrast, sometimes as little as 15 grey levels
+apart on real photos. Otsu, run over the whole crop including the disk,
+reliably locks onto disk-vs-everything instead of zone-vs-lawn --
+confirmed directly: a between-class-variance quality score computed the
+same way Otsu picks its threshold was *highest* (0.91-0.92) on exactly the
+real photos whose masks filled 100% of their crop, because that score was
+measuring the disk/background split, not zone/lawn. Fixed by excluding the
+disk's own area from Otsu's histogram before computing the threshold
+(`ZoneSegmenter._otsu_excluding_disk()`). Measured, not assumed: on the
+20-image identity-matched real-photo set, EA moved from 24.1% to 32.9%,
+MAE from 7.44mm to 6.28mm, Pearson r from 0.089 to 0.193 -- real progress,
+still well short of the 90% EA target and still limited by the fully
+confluent, zero-signal case described above.
 
 The identity-matched validation sample grew from 3 to 20 images (48 to 316
 disk-antibiotic pairs) this round, reaching the range this document

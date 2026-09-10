@@ -135,3 +135,48 @@ class TestSegmentAllVoronoiSplit:
         small = _disk_result(280, 200, 12)
         results = self.segmenter.segment_all(image, [small, big], px_per_mm=4.0)
         assert results[0].diameter_mm < results[1].diameter_mm
+
+
+def _low_contrast_plate(size: int = 300, disk_r: int = 20, zone_r: int = 35) -> np.ndarray:
+    """Disk much brighter than both zone and lawn, which are only 15 levels apart.
+
+    Models the real-photo failure this fixture exists to catch: when the
+    disk itself is included in Otsu's histogram, its much stronger contrast
+    against the background dominates threshold selection over the subtle
+    zone-vs-lawn difference, and the resulting mask fills almost the entire
+    crop instead of tracing the true (much smaller) zone boundary. Zone
+    darker than lawn matches ``_plate_image()``'s polarity (and real photos:
+    reflected-light Kirby-Bauer photography shows clear inhibited agar as
+    darker than the cloudier bacterial lawn) -- ``THRESH_BINARY_INV`` marks
+    the darker-than-threshold region as the zone.
+    """
+    image = np.full((size, size, 3), 115, dtype=np.uint8)
+    cx, cy = size // 2, size // 2
+    cv2.circle(image, (cx, cy), zone_r, (100, 100, 100), -1)
+    cv2.circle(image, (cx, cy), disk_r, (250, 250, 250), -1)
+    return image
+
+
+class TestOtsuExcludingDisk:
+    def setup_method(self) -> None:
+        self.segmenter = ZoneSegmenter(margin_factor=4.0)
+
+    def test_low_contrast_zone_not_swallowed_by_disk_dominated_threshold(self) -> None:
+        image = _low_contrast_plate(disk_r=20, zone_r=35)
+        disk = _disk_result(150, 150, 20)
+
+        result = self.segmenter.segment(image, disk, px_per_mm=4.0)
+
+        # True zone diameter is 70px. Including the disk in Otsu's histogram
+        # (the pre-fix behaviour) measures 168px on this exact fixture --
+        # more than double -- because the disk's much stronger contrast
+        # against the background dominates threshold selection over the
+        # 15-grey-level zone-vs-lawn difference.
+        assert result.diameter_px == pytest.approx(70.0, abs=5.0)
+
+    def test_excluding_disk_returns_binary_mask(self) -> None:
+        image = _low_contrast_plate()
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        binary = self.segmenter._otsu_excluding_disk(gray, 150, 150, 20)
+        assert set(np.unique(binary)) <= {0, 255}
+        assert binary.shape == gray.shape

@@ -38,9 +38,9 @@ Each disk matched to its reference by antibiotic identity (human-verified from t
 
 | Metric | Value | Target |
 |---|---|---|
-| Essential Agreement (EA, +-2 mm) | **24.1%** | >= 90% |
-| Mean Absolute Error (MAE) | **7.44 mm** | — |
-| Pearson r | **0.089** | — |
+| Essential Agreement (EA, +-2 mm) | **32.9%** | >= 90% |
+| Mean Absolute Error (MAE) | **6.28 mm** | — |
+| Pearson r | **0.193** | — |
 | Images identity-annotated | 20 |
 | Disk-antibiotic pairs (identity) | 316 |
 
@@ -52,18 +52,18 @@ Both diameter lists sorted ascending and paired by position. This does not verif
 
 | Metric | Value | Target | Criterion |
 |---|---|---|---|
-| Essential Agreement (EA, +-2 mm) | **27.3%** | >= 90% | ISO 20776-2 / EUCAST EDef 13.2 |
-| Mean Absolute Error (MAE) | **5.27 mm** | — | mm |
-| Pearson r | **0.608** | — | — |
+| Essential Agreement (EA, +-2 mm) | **38.1%** | >= 90% | ISO 20776-2 / EUCAST EDef 13.2 |
+| Mean Absolute Error (MAE) | **3.93 mm** | — | mm |
+| Pearson r | **0.783** | — | — |
 
 ### Bland-Altman limits of agreement (rank-order pairs)
 
 | Stat | Value |
 |---|---|
-| Bias (mean diff) | +2.99 mm |
-| SD of differences | 6.65 mm |
-| Upper LoA (+1.96 SD) | +16.03 mm |
-| Lower LoA (−1.96 SD) | -10.05 mm |
+| Bias (mean diff) | +0.95 mm |
+| SD of differences | 5.40 mm |
+| Upper LoA (+1.96 SD) | +11.54 mm |
+| Lower LoA (−1.96 SD) | -9.63 mm |
 | Pairs analysed | 944 |
 
 ### Definition of Essential Agreement used here
@@ -93,11 +93,17 @@ Two other fixes landed this round, with a measurable before/after:
 
 What this means for the headline numbers: rank-order EA moved from 32.8% to 26.9% across this round -- a *drop*, not an improvement, because the fixed detector now processes far more of the previously-excluded difficult images instead of silently failing on them. Fewer images being thrown out is progress even though the visible EA number went down; it is a more honest measurement over a harder, more complete sample, not a regression.
 
+### The disk itself was polluting Otsu's threshold selection
+
+A later round found a second, structural segmentation bug, unrelated to confluence: on many real UZH photos, every disk's zone mask filled essentially 100% of its crop's bounding box, *including on sparse 4-disk plates with no neighbour anywhere near* -- ruling out confluence or crop size as the cause (growing the crop measurably made it worse, not better, jumping to 45-50mm on a ~90mm plate). Direct pixel measurement found the real cause: the paper disk itself (bright, ~150-200) is almost always a far stronger bright/dark signal than the actual zone-vs-lawn contrast, sometimes as little as 15 grey levels apart on real photos. Otsu, run over the whole crop, reliably locks onto disk-vs-everything instead of zone-vs-lawn -- confirmed directly: a between-class-variance quality score computed the same way Otsu picks its threshold was *highest* (0.91-0.92) on exactly the real photos whose masks filled 100% of their crop, because that score was measuring the disk/background split, not zone/lawn.
+
+Fixed by excluding the disk's own area from Otsu's histogram before computing the threshold (`ZoneSegmenter._otsu_excluding_disk()`), so Otsu only ever sees the zone-vs-lawn contrast that is actually being measured. This is a real, measured improvement, not a reparameterization: on a controlled synthetic case with a 15-grey-level zone-vs-lawn gap, the old (disk-included) threshold measured a 70px true zone as 168px; the fix measured it as 70px, exact. On the real 20-image identity-matched set this round, EA moved from 24.1% to 32.9%, MAE from 7.44mm to 6.28mm, and Pearson r from 0.089 to 0.193 -- real progress, still well short of the 90% EA target.
+
 ## Still unresolved
 
 - **Zone segmentation on fully confluent real plates** (above). Voronoi splitting is implemented, tested, and verified correct when some boundary signal exists; it cannot help where the photograph itself has none. The 16-disk-dense UZH panel is a worst case for this -- a clinical panel with normal CLSI disk spacing (6-12 disks, properly separated) should confluence far less often, but this has not yet been measured directly.
-- **Identity-annotated sample grew from 3 to 20 images** (48 to 316 pairs), reaching the stable-estimate range this file itself called for. The larger sample changed Pearson r from -0.262 to +0.089 -- the earlier negative correlation was small-sample noise, not a real effect -- while EA and MAE held roughly steady (22.9%->24.1%, 7.11mm->7.44mm), confirming those two numbers reflect a real measurement limitation rather than an artifact of a tiny sample. The position-to-antibiotic mapping used to identity-annotate the 17 new images was derived from the fixed panel template shared by the first 3 (verified by direct visual reading of the printed disk labels on several images per template variant before applying it), not re-read label by label on every image -- documented here so the provenance is explicit.
-- **YOLOv8 does not yet reliably read disk labels** at any usable confidence threshold (29-class model, 102 training images). A single-class 'disk' detector trained on the same images reaches much higher mAP50 in early epochs (see Phase 2 status in docs/ROADMAP.md / CLAUDE.md) and can replace Hough for localisation, but disk *identity* still resolves through panel position, not label reading, until far more labelled data exists.
+- **Identity-annotated sample grew from 3 to 20 images** (48 to 316 pairs), reaching the stable-estimate range this file itself called for. Going from 3 to 20 images changed Pearson r from -0.262 to +0.089 -- the earlier negative correlation was small-sample noise, not a real effect. The position-to-antibiotic mapping used to identity-annotate the 17 new images was derived from the fixed panel template shared by the first 3 (verified by direct visual reading of the printed disk labels on several images per template variant before applying it), not re-read label by label on every image -- documented here so the provenance is explicit.
+- **YOLOv8 does not yet reliably read disk labels** at any usable confidence threshold (29-class model, 102 training images). A single-class 'disk' detector trained on the same images reaches mAP50=0.995 on its own held-out test split (see Phase 2 status in docs/ROADMAP.md / CLAUDE.md) but is **not** a proven replacement for Hough localisation despite that score: measured directly against the 80 real UZH photos this report evaluates, Hough matches the true disk count on 73.8% of images versus 60.0% for the single-class model -- a domain-gap effect, the 102 Roboflow training images do not resemble this dataset's photography closely enough. Hough stays the pipeline's real default. Disk *identity* still resolves through panel position, not label reading, either way.
 - **EA is well below the ISO 20776-2 / EUCAST EDef 13.2 target of 90%** on both matching strategies. State plainly: BacterioScope does not yet meet the accuracy bar for real, unconstrained clinical photographs. It performs acceptably on synthetic and controlled images; real-photo accuracy is an open problem this report exists to make visible, not to paper over.
 
 ## Excluded images
