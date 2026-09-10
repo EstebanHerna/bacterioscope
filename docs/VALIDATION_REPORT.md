@@ -15,6 +15,8 @@ S/I/R classification is **not** compared because:
 
 Full S/I/R validation against a CLSI-annotated reference is planned for Phase 3.
 
+**Read this before trusting the EA/MAE numbers below**: the UZH dataset's plates are square and cropped to nearly fill the frame (a research-imaging convention), not round plates with visible background like the phone photographs BacterioScope's plate-rim calibration is designed for. Some of the error below reflects that mismatch, not necessarily real-world accuracy on the round-plate phone photographs the tool actually targets. See docs/LIMITACIONES.md section 9 for the full finding.
+
 ### Matching strategy
 
 Two strategies are reported, clearly separated below: **identity matching** (each disk paired to its reference by the antibiotic printed on it, human-verified) where annotation exists, and **rank-order pairing** (both sets sorted ascending and paired by position) everywhere else. Rank-order pairing does not verify that the same physical disk is being compared and is reported only as an optimistic upper bound, never as the project's accuracy figure. Automatic per-antibiotic matching without manual annotation requires Phase 2 (YOLOv8 label reading) at a confidence level that is not yet reliable.

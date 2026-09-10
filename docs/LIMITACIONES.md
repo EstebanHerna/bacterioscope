@@ -3,6 +3,13 @@
 This document states the known limitations of BacterioScope Phase 0 explicitly.
 Understanding what the system does not do is as important as knowing what it does.
 
+**Read section 9 before trusting any EA/MAE number in this document or in
+VALIDATION_REPORT.md at face value.** The UZH validation dataset's plates are
+square and cropped to nearly fill the frame -- a research-imaging-system
+convention, not what a clinician photographing a round Petri dish with a phone
+produces. The plate-rim calibration this project validates against was designed
+for the latter. Every EA/MAE figure below was measured on the former.
+
 ---
 
 ## 1. Measurement validation only — not S/I/R validation
@@ -227,3 +234,59 @@ for a clinical decision-support tool. This needs sign-off from the project's
 microbiology team (Paula Becerra Lara, Farid) against the actual CLSI M100-Ed33
 table before either adding a separate `"cefotaxime"` entry or documenting the
 merge as an intentional, confirmed equivalence.
+
+---
+
+## 9. The UZH validation dataset's plates do not match the plate-rim calibration's design assumption
+
+`calibrate_px_per_mm()` / `detect_plate_circle()` (`calibration.py`) is designed
+for the scenario this project actually targets: a clinician photographs a round
+Kirby-Bauer Petri dish with a phone, with some bench visible around the plate.
+HoughCircles finds the round rim and derives px/mm from it.
+
+Found by direct visual audit: the UZH validation dataset's plates are not round.
+They are square (rounded-corner square dishes, consistent with the SIRscan
+automated-imaging-system protocol the dataset comes from) and cropped so tightly
+that they fill essentially the entire canonical-resized frame -- a fixed
+low-threshold background segmentation found the plate occupying 99-100% of the
+frame on the images checked. There is no round rim in these photographs for
+HoughCircles to find.
+
+`detect_plate_circle()` still returns *something* on every UZH image -- but
+direct measurement shows why that should not be trusted: the returned diameter
+sits at a suspiciously consistent 91-99% of `min(image_height, image_width)` (the
+function's own search ceiling, `max_radius = min(h,w)//2`) across 20 images,
+while the returned centre X-coordinate swings wildly (-334px to +336px from image
+centre across the same 20 images, no stable pattern). A detector genuinely
+finding a fixed, real feature would show the opposite pattern -- stable position,
+size varying with the actual feature. This one is grabbing *something* circular-ish
+within its allowed size range each time, not consistently the same real boundary.
+
+Checked for comparison: `examples/real/*.jpg` (genuine phone-style photography,
+round plates, real background) shows the expected variety instead -- background
+fill from 16% to 86% of frame, circle-to-frame ratio from 0.54 to 0.96. That
+variety is itself evidence the detector is doing something meaningful on
+*those* images; the UZH set's narrow, saturated numbers are the anomaly.
+
+**What this means for every EA/MAE figure in this document and in
+VALIDATION_REPORT.md:** all of them were measured against the UZH dataset. Some
+of the residual error they show is a genuine mismatch between the calibration
+algorithm's design (round plate, visible background) and this dataset's
+photographic convention (square plate, near-zero background), not necessarily a
+reflection of how BacterioScope performs on the round-plate phone photographs it
+is actually built for. This is not quantified separately in this round -- doing
+so honestly would need independently-measured px/mm ground truth on a
+representative square-plate sample, which does not exist, or a genuinely
+round-plate validation set at the same scale as UZH's 225 images, which also
+does not exist yet.
+
+**Deliberately not fixed this round:** the obvious-looking fix (detect the
+plate's bounding box instead of a circle when no strong circular edge exists) was
+not applied, because doing so risks tuning the calibration path toward the UZH
+dataset's own idiosyncrasy (square, full-frame) at the expense of the tool's
+actual target scenario (round plate, phone photo, visible background) --
+exactly the kind of dataset-shaped fix this document has repeatedly warned
+against elsewhere. A shape-adaptive calibration (detect round vs. square,
+choose the method) is a legitimate future direction, but needs its own
+validation against representative data for each plate shape before it can be
+trusted, not a same-session patch.

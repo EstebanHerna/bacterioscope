@@ -393,6 +393,14 @@ def _write_report(
         "",
         "Full S/I/R validation against a CLSI-annotated reference is planned for Phase 3.",
         "",
+        "**Read this before trusting the EA/MAE numbers below**: the UZH dataset's "
+        "plates are square and cropped to nearly fill the frame (a research-imaging "
+        "convention), not round plates with visible background like the phone "
+        "photographs BacterioScope's plate-rim calibration is designed for. Some of "
+        "the error below reflects that mismatch, not necessarily real-world accuracy "
+        "on the round-plate phone photographs the tool actually targets. See "
+        "docs/LIMITACIONES.md section 9 for the full finding.",
+        "",
         "### Matching strategy",
         "",
         "Two strategies are reported, clearly separated below: **identity matching** "
