@@ -21,6 +21,13 @@ ROBOFLOW_TO_CLSI: dict[str, str] = {
     "CIP 10": "ciprofloxacin",
     "CPM 30": "cefepime",
     "CRO 30": "ceftriaxone",
+    # CTX is the standard code for cefotaxime, a distinct drug from
+    # ceftriaxone (CRO) -- not an abbreviation-convention merge like GM/GEN
+    # below. Mapped here because CLSI_2023_ENTEROBACTERIACEAE (clsi.py) has
+    # no separate cefotaxime entry; flagged as unverified in
+    # docs/LIMITACIONES.md section 8 pending microbiology team sign-off on
+    # whether CLSI M100-Ed33 breakpoints for the two drugs are in fact
+    # identical for Enterobacteriaceae. Do not assume this is settled.
     "CTX 30": "ceftriaxone",
     "GEN 10": "gentamicin",
     "GM 10": "gentamicin",

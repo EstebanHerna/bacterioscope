@@ -38,21 +38,29 @@ confidence level -- `confidence_threshold` is deliberately kept at a defensible
 0.25 floor rather than lowered to force detections out of an undertrained
 model. A single-class "disk" detector (collapsing all 29 antibiotic classes to
 one "disk" label, letting panel position resolve identity instead) finished
-training and reaches mAP50=0.995 on its own held-out Roboflow test split --
-but does not, by itself, remove the manual assignment step, and is **not**
-a proven replacement for Hough-based localisation despite that score.
-Measured directly against the 80 real UZH photos this project validates
-against (expected disk count taken from the DOCX-derived ground truth,
-independent of either detector): Hough matches the true disk count on
-73.8% of images versus 60.0% for the single-class YOLO model. The
-Roboflow training set (102 images) does not resemble the UZH photography
-protocol closely enough for the model to generalise as well as its own
-test-split score suggests. It remains available for anyone who wants to
-use it (`PipelineConfig(detector_weights=Path("data/models/single_class/
-yolov8_disks.pt"))`), with a real labelling bug fixed this round (every
-detection previously shared the literal class name `'disk'`, now numbered
-`disk_0`, `disk_1`, ... to match Hough), but the pipeline's default stays
-on Hough until a domain-matched training set closes this gap.
+training and reaches mAP50=0.995 on its own held-out Roboflow test split.
+It does not, by itself, remove the manual assignment step (identity still
+resolves through panel position, not label reading).
+
+An earlier round of this document claimed it "is not a proven replacement
+for Hough" based on a head-to-head at `conf=0.5` (60.0% exact disk-count
+match vs Hough's 73.8% on the 80 real UZH photos this project validates
+against). That comparison used an untuned threshold and was wrong. A
+confidence sweep found a sharp optimum around `conf=0.27-0.30`:
+**76-77.5% exact-count match, matching or slightly beating Hough** --
+the earlier conclusion is corrected here rather than left standing. The
+model is real and usable
+(`PipelineConfig(detector_weights=Path("data/models/single_class/
+yolov8_disks.pt"), confidence_threshold=0.28)`), with a real labelling bug
+also fixed this round (every detection previously shared the literal
+class name `'disk'`, now numbered `disk_0`, `disk_1`, ... to match Hough).
+The pipeline's default still stays on Hough for now -- not because the
+single-class model measured worse, but because switching the default
+detector is a broader deployment decision (adds a torch/ultralytics
+dependency and model-load latency, and the model's sharp sensitivity to
+the confidence threshold, near-zero exact matches just outside the
+0.27-0.30 band, is a real operational risk Hough does not carry) that
+has not yet been made, not a closed question.
 
 ---
 
@@ -186,3 +194,31 @@ The Webber et al. 2022 evidence base supports reading disk diffusion at 6–10 h
 with acceptable categorical agreement. This capability is on the Phase 3–4 roadmap
 and has not been implemented or validated in BacterioScope. No current version of
 the system is designed for or validated with early-reading protocols.
+
+---
+
+## 8. Cefotaxime disks are reported as "ceftriaxone" — flagged, not fixed
+
+Found by direct code audit, not measurement: `label_map.py::ROBOFLOW_TO_CLSI` maps
+the YOLO class `"CTX 30"` to `"ceftriaxone"`. CTX is the standard disk-diffusion
+abbreviation for **cefotaxime**, a distinct drug from ceftriaxone (CRO) — same
+cephalosporin class, but not the same antibiotic. `CLSI_2023_ENTEROBACTERIACEAE`
+(`clsi.py`) has no separate `"cefotaxime"` entry, so a cefotaxime disk is classified
+using ceftriaxone's breakpoints and reported to the user as ceftriaxone.
+
+This is unlike the `"GM 10"` / `"GEN 10"` merge a few lines below it in the same
+map, which is correct: those are two abbreviation conventions for the *same* drug,
+gentamicin. CTX and CRO are two different drugs.
+
+**Why this is flagged instead of fixed directly:** CLSI M100 does, in most recent
+editions, publish identical Enterobacterales zone-diameter breakpoints for
+ceftriaxone and cefotaxime, which would mean the S/I/R *call* is unaffected even
+though the *reported drug name* is wrong -- but this is recalled from general
+clinical-microbiology knowledge, not verified against the actual M100-Ed33 document
+this project cites everywhere else, and the earlier segmentation and calibration
+fixes in this document were only made after measuring them directly. A wrong
+breakpoint value asserted with unearned confidence is worse than an open question
+for a clinical decision-support tool. This needs sign-off from the project's
+microbiology team (Paula Becerra Lara, Farid) against the actual CLSI M100-Ed33
+table before either adding a separate `"cefotaxime"` entry or documenting the
+merge as an intentional, confirmed equivalence.

@@ -82,11 +82,15 @@ defensible confidence threshold. The project pivoted to the single-class approac
 described in `CLAUDE.md`'s "Key design decisions" and F2 row: one "disk" class for
 localization, identity resolved by panel position (`panels/manager.py`) instead of
 per-disk label reading. That single-class model trained cleanly (mAP50=0.995 on its own
-held-out Roboflow split) but, measured directly against real UZH photos, does not yet
-outperform the existing Hough-based localization -- a real domain-gap finding, not a
-training bug. Full automated label reading (this phase's original goal) remains
-unimplemented; the acceptance criteria below describe the original per-antibiotic-class
-target, not the current single-class architecture.
+held-out Roboflow split) and, once its confidence threshold was properly tuned (an
+earlier comparison at an untuned conf=0.5 wrongly concluded otherwise -- see F2 row
+in `CLAUDE.md`), matches or slightly outperforms the existing Hough-based localization
+on real UZH photos at conf~0.27-0.30. The pipeline's default detector stays on Hough
+regardless, as a deployment choice (dependency weight, model-load latency, and a real
+threshold-sensitivity risk the single-class model has that Hough does not), not because
+the single-class model measures worse. Full automated label reading (this phase's
+original goal) remains unimplemented; the acceptance criteria below describe the
+original per-antibiotic-class target, not the current single-class architecture.
 
 ### Goal
 
