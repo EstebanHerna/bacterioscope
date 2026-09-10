@@ -75,9 +75,14 @@ performance include:
 - Non-standard agar colour (e.g. blood agar vs Mueller-Hinton).
 - Overlapping zones from closely spaced disks.
 
-The system includes a CLAHE (Contrast Limited Adaptive Histogram Equalization)
-option for real-plate images, but there is no guarantee of accurate segmentation
-under extreme or unusual lighting conditions.
+`ZoneSegmenter` has a CLAHE (Contrast Limited Adaptive Histogram Equalization)
+option, off by default and not exposed through `PipelineConfig`, the CLI, or the
+Streamlit demo -- nothing in the running pipeline can enable it today. Measured
+directly on the 20-image identity-matched real-photo set rather than left as a
+theoretical option: it makes measurements worse, not better (EA 32.9% -> 24.7%,
+MAE 6.28mm -> 7.29mm), so leaving it off is correct, not an oversight. There is
+no guarantee of accurate segmentation under extreme or unusual lighting
+conditions, and CLAHE is not the fix for that.
 
 **Confirmed, not theoretical, and partially addressed:** an identity-matched
 validation pass (see [VALIDATION_REPORT.md](VALIDATION_REPORT.md)) found that

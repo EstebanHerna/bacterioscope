@@ -147,9 +147,13 @@ class ZoneSegmenter:
             rather than a larger one.
         use_clahe: When ``True``, apply Contrast Limited Adaptive Histogram
             Equalization (CLAHE) to the grayscale ROI before Otsu thresholding.
-            Improves performance on real plate photographs with uneven bench
-            lighting, flash reflections, or non-uniform agar pigmentation.
-            Adds ~2 ms per disk; leave ``False`` for synthetic images.
+            Not exposed through ``PipelineConfig``, the CLI, or the Streamlit
+            demo -- nothing in the running pipeline enables this today, by
+            design: measured directly on the 20-image identity-matched
+            real-photo set, it makes measurements worse, not better (EA
+            32.9%->24.7%, MAE 6.28mm->7.29mm), contrary to the theoretical
+            expectation that local contrast enhancement should help uneven
+            lighting. Keep ``False`` unless a future dataset shows otherwise.
     """
     def __init__(self, margin_factor: float = 4.0, use_clahe: bool = False) -> None:
         self.margin_factor = margin_factor
