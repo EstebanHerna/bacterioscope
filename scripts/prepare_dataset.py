@@ -33,6 +33,27 @@ from pathlib import Path
 
 _IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 
+# A zone cannot be smaller than the disk itself (6mm) or larger than the
+# plate it was measured on (90mm, standard Mueller-Hinton). Found by direct
+# audit of ground_truth.csv: one source DOCX table records meropenem as
+# "365" (Table 4.59.1, almost certainly "36.5" with the decimal point lost
+# in transcription -- 36.5mm is a normal meropenem zone, 365mm is not
+# physically possible). Excluded rather than guess-corrected: silently
+# "fixing" a transcription error risks inventing a value that was never
+# measured. This is a single known case, not a systemic parser bug -- the
+# check exists so any future occurrence is caught the same way.
+_MIN_PLAUSIBLE_ZONE_MM = 6.0
+_MAX_PLAUSIBLE_ZONE_MM = 90.0
+
+
+def _is_plausible_diameter(diameter: str) -> bool:
+    """Return True if `diameter` parses as a physically plausible zone size."""
+    try:
+        value = float(diameter)
+    except ValueError:
+        return False
+    return _MIN_PLAUSIBLE_ZONE_MM <= value <= _MAX_PLAUSIBLE_ZONE_MM
+
 _EUCAST_TO_CLSI_NAME: dict[str, str] = {
     "AMP": "ampicillin",
     "AMC": "amoxicillin-clavulanate",
@@ -143,9 +164,7 @@ def _process_rows(
         if image_path is None:
             skipped += 1
             continue
-        try:
-            float(diameter)
-        except ValueError:
+        if not _is_plausible_diameter(diameter):
             skipped += 1
             continue
         output.append({
@@ -214,6 +233,7 @@ def _process_docx_dir(
 ) -> list[dict[str, str]]:
     output: list[dict[str, str]] = []
     skipped_images = 0
+    skipped_implausible: list[tuple[str, str, str]] = []
     for docx_path in docx_files:
         isolate_id = _isolate_id_from_docx(docx_path)
         image_path = _match_image(isolate_id, images)
@@ -221,9 +241,8 @@ def _process_docx_dir(
             skipped_images += 1
             continue
         for code, diameter, category in _parse_docx_measurements(docx_path):
-            try:
-                float(diameter)
-            except ValueError:
+            if not _is_plausible_diameter(diameter):
+                skipped_implausible.append((image_path.name, code, diameter))
                 continue
             output.append({
                 "source": source_name,
@@ -236,6 +255,11 @@ def _process_docx_dir(
             })
     if skipped_images:
         print(f"    Skipped {skipped_images} isolates (no matching image).")
+    for image_name, code, diameter in skipped_implausible:
+        print(
+            f"    Skipped implausible measurement: {image_name} {code}={diameter}mm "
+            f"(outside {_MIN_PLAUSIBLE_ZONE_MM}-{_MAX_PLAUSIBLE_ZONE_MM}mm range)."
+        )
     return output
 
 
