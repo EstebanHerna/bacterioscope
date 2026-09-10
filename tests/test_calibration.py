@@ -4,7 +4,12 @@ import cv2
 import numpy as np
 import pytest
 
-from bacterioscope.utils.calibration import calibrate_from_disk_radius_px, calibrate_px_per_mm
+from bacterioscope.detection.detector import DiskResult
+from bacterioscope.utils.calibration import (
+    calibrate_from_disk_radius_px,
+    calibrate_px_per_mm,
+    refine_disk_radius_px,
+)
 
 
 def _blank_image(size: int = 400) -> np.ndarray:
@@ -78,3 +83,51 @@ class TestCalibratePxPerMm:
             diameter_px, px_per_mm = calibrate_px_per_mm(image)
             assert diameter_px > 0
             assert px_per_mm > 0
+
+
+def _disk_result(cx: int, cy: int, radius: int) -> DiskResult:
+    return DiskResult(
+        label="disk_0", center_x=cx, center_y=cy, radius_px=radius,
+        confidence=0.9, bbox=(cx - radius, cy - radius, cx + radius, cy + radius),
+    )
+
+
+def _plate_with_disks(size: int, positions: list[tuple[int, int, int]]) -> np.ndarray:
+    """Dark background with bright circular disks at the given (cx, cy, radius)."""
+    image = np.full((size, size, 3), 60, dtype=np.uint8)
+    for cx, cy, r in positions:
+        cv2.circle(image, (cx, cy), r, (220, 220, 220), -1)
+    return image
+
+
+class TestRefineDiskRadius:
+    def test_recovers_true_radius_independent_of_seed(self) -> None:
+        image = _plate_with_disks(400, [(200, 200, 25)])
+        # Detector's own seed radius is deliberately wrong (biased low);
+        # refinement should recover the true drawn radius regardless.
+        disk = _disk_result(200, 200, 15)
+
+        refined = refine_disk_radius_px(image, [disk])
+
+        assert refined == pytest.approx(25.0, abs=2.0)
+
+    def test_median_across_multiple_disks(self) -> None:
+        image = _plate_with_disks(500, [(120, 120, 20), (380, 120, 20), (250, 380, 20)])
+        disks = [_disk_result(120, 120, 20), _disk_result(380, 120, 20), _disk_result(250, 380, 20)]
+
+        refined = refine_disk_radius_px(image, disks)
+
+        assert refined == pytest.approx(20.0, abs=2.0)
+
+    def test_empty_disks_raises(self) -> None:
+        image = _plate_with_disks(300, [])
+        with pytest.raises(ValueError, match="disks must be non-empty"):
+            refine_disk_radius_px(image, [])
+
+    def test_falls_back_to_seed_radius_when_no_edge_found(self) -> None:
+        image = np.full((300, 300, 3), 128, dtype=np.uint8)  # flat, no disk edge anywhere
+        disk = _disk_result(150, 150, 18)
+
+        refined = refine_disk_radius_px(image, [disk])
+
+        assert refined > 0.0

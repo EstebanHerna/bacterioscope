@@ -129,6 +129,23 @@ resolved an artifact of the earlier tiny sample (Pearson r moved from
 small-sample noise) while confirming EA and MAE as real, not noise
 (22.9%->24.1%, 7.11mm->7.44mm across the two sample sizes).
 
+**Disk-based calibration (`use_disk_calibration`, Phase 3) was investigated
+and found to have been non-independent by construction.** Disk detection
+runs with `px_per_mm=px_per_mm_rim` already set, and Hough's disk-radius
+search window is derived from that same plate-rim estimate -- so the
+"disk-calibrated" ratio was plate-rim calibration scaled by whatever Hough
+voted for inside a window centred on it, not an independent measurement
+(confirmed: a suspiciously tight ~0.80x ratio across 20 real photos).
+Fixed with a local, calibration-independent Otsu re-measurement of each
+disk's true edge (`calibration.py::refine_disk_radius_px()`), which closed
+most of the gap (identity-matched EA 14.9%->28.8%, MAE 8.88mm->7.42mm).
+Even measured correctly, though, disk calibration still trails plate-rim
+calibration (32.9% EA, 6.28mm MAE) -- not a remaining bug, a consequence
+of calibrating against a ~50-60px reference (the disk) instead of a
+~550-600px one (the plate): the same few pixels of edge noise are a much
+larger relative error against the smaller reference. `use_disk_calibration`
+stays `False` by default.
+
 ---
 
 ## 4. Tool for support — confirmation by a qualified professional is required

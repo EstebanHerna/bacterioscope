@@ -596,6 +596,33 @@ def _write_report(
         "r from 0.089 to 0.193 -- real progress, still well short of the "
         "90% EA target.",
         "",
+        "### Disk-based calibration was never independent of plate-rim calibration",
+        "",
+        "`use_disk_calibration` (Phase 3) was investigated directly rather "
+        "than left as an open question. It was not measuring the disk "
+        "independently at all: `pipeline.analyze()` calls `detector.detect"
+        "(image, px_per_mm=px_per_mm_rim)` *before* disk calibration runs, "
+        "and Hough's disk-radius search window is derived from that same "
+        "plate-rim estimate. The reported disk radius was therefore "
+        "plate-rim calibration scaled by whatever Hough voted for inside a "
+        "window centred on that same estimate -- confirmed directly: "
+        "across 20 real photos the resulting ratio was a suspiciously "
+        "tight ~0.80x, far too consistent to be an independent physical "
+        "measurement.",
+        "",
+        "Fixed with `calibration.py::refine_disk_radius_px()`: a local, "
+        "calibration-independent Otsu threshold re-measures each disk's "
+        "true edge directly in a small crop around its detected centre. "
+        "This closed most of the gap on the 20-image identity-matched set "
+        "(EA 14.9% -> 28.8%, MAE 8.88mm -> 7.42mm) -- real progress on a "
+        "real bug. But disk calibration still trails plate-rim calibration "
+        "(32.9% EA, 6.28mm MAE) even once measured correctly, and this "
+        "remaining gap is not a bug: it is reference size. The plate rim "
+        "spans roughly 550-600px in a canonical-resized image; a disk "
+        "spans roughly 50-60px. The same few pixels of edge-detection "
+        "noise are a far larger *relative* error against the smaller "
+        "reference. `use_disk_calibration` stays `False` by default.",
+        "",
         "## Still unresolved",
         "",
         "- **Zone segmentation on fully confluent real plates** (above). "

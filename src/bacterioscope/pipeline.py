@@ -63,7 +63,11 @@ from bacterioscope.classification.clsi import (
 )
 from bacterioscope.detection.detector import DiskDetector, DiskResult
 from bacterioscope.segmentation.watershed import ZoneResult, ZoneSegmenter
-from bacterioscope.utils.calibration import calibrate_from_disk_radius_px, calibrate_px_per_mm
+from bacterioscope.utils.calibration import (
+    calibrate_from_disk_radius_px,
+    calibrate_px_per_mm,
+    refine_disk_radius_px,
+)
 from bacterioscope.utils.image import load_image, resize_canonical
 from bacterioscope.utils.visualization import draw_results, has_watermark
 
@@ -127,10 +131,17 @@ class PipelineConfig:
         clsi_version: Edition of CLSI M100 to apply.  Currently ``'2023'``
             (M100-Ed33).
         use_disk_calibration: If ``True`` and at least one disk is detected,
-            derive px/mm from the median disk radius using the known 6 mm
-            physical disk diameter (CLSI M02) instead of plate-rim Hough
-            detection.  More robust under variable lighting.  Defaults to
-            ``False`` for backwards compatibility.
+            derive px/mm from the median disk radius (re-measured
+            independently via ``calibration.py::refine_disk_radius_px()``,
+            not the detector's own radius) using the known 6 mm physical
+            disk diameter (CLSI M02) instead of plate-rim Hough detection.
+            Measured directly on 80 real UZH photos: even with an
+            unbiased, independent measurement, this underperforms
+            plate-rim calibration (identity-matched EA 28.8% vs 32.9%) --
+            not a bug, a consequence of calibrating against a ~50-60px
+            reference (the disk) instead of a ~550-600px one (the plate),
+            which makes the same few pixels of edge noise a proportionally
+            larger calibration error.  Defaults to ``False``.
         disk_diameter_mm: Physical diameter of a standard antibiotic disk in
             mm.  Used when ``use_disk_calibration`` is ``True``, and always
             used to derive the calibrated Hough disk-search radius (see
@@ -354,7 +365,7 @@ class BacterioScopePipeline:
         t_det = time.perf_counter()
 
         if self.config.use_disk_calibration and disks:
-            median_radius = float(np.median([d.radius_px for d in disks]))
+            median_radius = refine_disk_radius_px(image, disks)
             px_per_mm = calibrate_from_disk_radius_px(median_radius, self.config.disk_diameter_mm)
 
         disk_calibration_ratio = self._disk_calibration_ratio(disks, px_per_mm)
