@@ -60,20 +60,50 @@ class TestComputeFlagsQuality:
 
 
 class TestComputeFlagsBoundary:
-    def test_flag_boundary_zone_touches_left_edge(self, pipeline: BacterioScopePipeline) -> None:
-        zone = _zone(cx=30, cy=100, r=40.0)
-        flags = pipeline._compute_flags([_disk(cx=30)], [zone], (300, 300, 3))
+    """A tolerance of _BOUNDARY_TOLERANCE_PX (15px) applies before flagging.
+
+    Added after a 20-image real-photo audit found a zero-tolerance check
+    flagged 45% of disks with a median overshoot of only 12px on a ~1024px
+    image -- ordinary fitted-circle rounding noise on a dense grid, not a
+    genuinely truncated measurement. Overshoots that matter (seen up to
+    75px in the same audit) still flag under the tolerance.
+    """
+
+    def test_flag_boundary_zone_well_past_left_edge(self, pipeline: BacterioScopePipeline) -> None:
+        zone = _zone(cx=10, cy=100, r=40.0)  # left edge at -30, overshoot 30
+        flags = pipeline._compute_flags([_disk(cx=10)], [zone], (300, 300, 3))
         assert "boundary" in flags[0]
 
-    def test_flag_boundary_zone_touches_right_edge(self, pipeline: BacterioScopePipeline) -> None:
-        zone = _zone(cx=270, cy=100, r=40.0)
-        flags = pipeline._compute_flags([_disk(cx=270)], [zone], (300, 300, 3))
+    def test_flag_boundary_zone_well_past_right_edge(self, pipeline: BacterioScopePipeline) -> None:
+        zone = _zone(cx=290, cy=100, r=40.0)  # right edge at 330, overshoot 30
+        flags = pipeline._compute_flags([_disk(cx=290)], [zone], (300, 300, 3))
         assert "boundary" in flags[0]
 
     def test_no_boundary_flag_for_centred_zone(self, pipeline: BacterioScopePipeline) -> None:
         zone = _zone(cx=150, cy=150, r=40.0)
         flags = pipeline._compute_flags([_disk(cx=150, cy=150)], [zone], (400, 400, 3))
         assert "boundary" not in flags[0]
+
+    def test_small_overshoot_within_tolerance_not_flagged(
+        self, pipeline: BacterioScopePipeline,
+    ) -> None:
+        zone = _zone(cx=30, cy=100, r=40.0)  # left edge at -10, overshoot 10 (< 15px tolerance)
+        flags = pipeline._compute_flags([_disk(cx=30)], [zone], (300, 300, 3))
+        assert "boundary" not in flags[0]
+
+    def test_overshoot_exactly_at_tolerance_not_flagged(
+        self, pipeline: BacterioScopePipeline,
+    ) -> None:
+        zone = _zone(cx=25, cy=100, r=40.0)  # left edge at -15, overshoot 15 (== tolerance)
+        flags = pipeline._compute_flags([_disk(cx=25)], [zone], (300, 300, 3))
+        assert "boundary" not in flags[0]
+
+    def test_overshoot_one_past_tolerance_flagged(
+        self, pipeline: BacterioScopePipeline,
+    ) -> None:
+        zone = _zone(cx=24, cy=100, r=40.0)  # left edge at -16, overshoot 16 (> tolerance)
+        flags = pipeline._compute_flags([_disk(cx=24)], [zone], (300, 300, 3))
+        assert "boundary" in flags[0]
 
 
 class TestComputeFlagsOverlap:

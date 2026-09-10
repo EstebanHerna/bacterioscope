@@ -75,6 +75,11 @@ log = logging.getLogger(__name__)
 
 _SOFTWARE_VERSION: str = "0.1.0"
 
+# How far a zone's fitted circle may extend past the image edge before the
+# 'boundary' quality flag fires. See _compute_flags() for why zero tolerance
+# was too strict in practice.
+_BOUNDARY_TOLERANCE_PX: int = 15
+
 
 def _get_commit_hash() -> str:
     """Return the current git short hash, or 'unknown' if git is unavailable."""
@@ -477,8 +482,14 @@ class BacterioScopePipeline:
                 irregular or asymmetric inhibition pattern.
             small_zone: zone diameter < 6 mm (smaller than the physical disk
                 itself), likely a detection error or fully resistant organism.
-            boundary: zone extends to or beyond the image edge, truncating the
-                measurement.
+            boundary: zone extends more than ``_BOUNDARY_TOLERANCE_PX`` beyond
+                the image edge, truncating the measurement. The tolerance
+                exists because a zero-tolerance check flagged 45% of disks on
+                a 20-image real-photo audit, with a median overshoot of only
+                12px on a ~1024px-wide image (~1%) -- ordinary fitted-circle
+                rounding noise on a dense grid, not a truncated measurement.
+                Overshoots that are actually severe (seen up to 75px in the
+                same audit) still flag.
             overlap: zone overlaps with the zone of an adjacent disk.
 
         Args:
@@ -498,8 +509,11 @@ class BacterioScopePipeline:
                 flags[i].append("small_zone")
             if zone.radius_px > 0:
                 r = int(zone.radius_px)
-                if zone.center_x - r < 0 or zone.center_y - r < 0 \
-                        or zone.center_x + r > w or zone.center_y + r > h:
+                overshoot = max(
+                    -(zone.center_x - r), -(zone.center_y - r),
+                    (zone.center_x + r) - w, (zone.center_y + r) - h,
+                )
+                if overshoot > _BOUNDARY_TOLERANCE_PX:
                     flags[i].append("boundary")
         for i in range(len(disks)):
             for j in range(i + 1, len(disks)):
