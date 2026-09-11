@@ -76,7 +76,7 @@ El sistema está implementado en Python 3.10+ y opera en un pipeline modular:
 | Sistema de paneles (asignación automática por posición angular) | Completo |
 | Procesamiento por lotes con CSV de resultados y log de errores | Completo |
 | Instrumentación de rendimiento (tiempos por etapa en ms) | Completo |
-| Suite de pruebas | 228 pruebas, 93.9% de cobertura |
+| Suite de pruebas | 258 pruebas, 95.3% de cobertura |
 | CI (GitHub Actions) | Verde en Python 3.10, 3.11, 3.12 |
 
 **Limitación de Fase 0:** la detección usa círculos geométricos (sin aprendizaje automático) y el antibiótico se asigna manualmente en la UI o mediante un panel predefinido. La Fase 2 elimina ambas restricciones mediante YOLOv8.

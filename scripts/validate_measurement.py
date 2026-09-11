@@ -565,13 +565,17 @@ def _write_report(
         "YOLO returns nothing) | Images with correct disk count: 24/80 -> "
         "70/80 |",
         "",
-        "What this means for the headline numbers: rank-order EA moved from "
-        "32.8% to 26.9% across this round -- a *drop*, not an improvement, "
-        "because the fixed detector now processes far more of the previously-"
-        "excluded difficult images instead of silently failing on them. Fewer "
-        "images being thrown out is progress even though the visible EA number "
-        "went down; it is a more honest measurement over a harder, more "
-        "complete sample, not a regression.",
+        "What this meant for the headline numbers *at that point in the "
+        "project's history*: rank-order EA moved from 32.8% to 26.9% across "
+        "this round -- a *drop*, not an improvement, because the fixed "
+        "detector now processes far more of the previously-excluded "
+        "difficult images instead of silently failing on them. Fewer "
+        "images being thrown out is progress even though the visible EA "
+        "number went down; it is a more honest measurement over a harder, "
+        "more complete sample, not a regression. Later rounds (below) moved "
+        "rank-order EA further, to the figure reported in the table at the "
+        "top of this document -- this 26.9% figure is a step in that "
+        "history, not the current number.",
         "",
         "### The disk itself was polluting Otsu's threshold selection",
         "",

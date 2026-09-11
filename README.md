@@ -82,7 +82,7 @@ The end-to-end pipeline is fully operational on the Hough + Otsu baseline.
 | Design system (Clinical Slate palette, CSS custom properties, dark/light mode) | Complete |
 | Traceability (analysis_id UUID, image SHA-256, commit hash, CLSI edition, stage timings) | Complete |
 | Bland-Altman measurement accuracy analysis (`scripts/validate_measurement.py`) | Complete |
-| Test suite | 236 tests, 93.8% coverage |
+| Test suite | 258 tests, 95.3% coverage |
 | CI (GitHub Actions) | Green on Python 3.10, 3.11, 3.12 |
 | Static analysis | ruff, mypy strict, bandit, gitleaks |
 
@@ -96,7 +96,7 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for full detail. See [docs/RESUMEN_EVALUA
 
 | Phase | Scope | Status |
 |---|---|---|
-| **F0** | End-to-end pipeline, Hough baseline, CLSI classifier, Streamlit demo, CLI, API, evaluation module, panel configuration, scientific HTML reports, batch processing, design system, traceability, 228 tests, CI | **Complete** |
+| **F0** | End-to-end pipeline, Hough baseline, CLSI classifier, Streamlit demo, CLI, API, evaluation module, panel configuration, scientific HTML reports, batch processing, design system, traceability, 258 tests, CI | **Complete** |
 | **F1** | Curate and annotate the Dryad/UZH public dataset (225 Gram-negative isolates with clinical ground truth) | Planned |
 | **F2** | Train YOLOv8 to detect each disk and read its printed antibiotic label — eliminates manual assignment. Roboflow KB-AST dataset ready (102 train images, 29 antibiotic disk classes), label→CLSI mapping complete, GPU training pending. | **In Progress** |
 | **F3** | Calibrate mm measurement using the 6 mm disk as physical reference; validate EA >=90%, CA >=90%, VME <=1.5% | Planned |
@@ -251,7 +251,7 @@ bacterioscope/
 ├── panels/                  <- YAML panel configs (antibiotics by clockwise position)
 │   ├── enterobacteria_clsi_12.yaml
 │   └── enterobacteria_clsi_6.yaml
-├── tests/                   <- 228 tests, mirrors src/ structure
+├── tests/                   <- 258 tests, mirrors src/ structure
 ├── scripts/
 │   ├── download_data.py        <- Dryad/UZH downloader with manual-step instructions
 │   ├── prepare_dataset.py      <- normalise UZH CSV for validation pipeline

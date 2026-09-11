@@ -51,7 +51,7 @@ Prepare a clean, labelled training and validation set from the Dryad/UZH public 
 
 ### Dataset
 
-**Dryad/UZH (Giske et al., 2024):** 225 Gram-negative clinical isolates, 862 phenotypic categories. Includes ESBL, AmpC, and carbapenemase-producing strains. Full clinical ground truth (zone diameter in mm and S/I/R per antibiotic per isolate).
+**Dryad/UZH (Egli et al., 2023):** 225 Gram-negative clinical isolates, 862 phenotypic categories. Includes ESBL, AmpC, and carbapenemase-producing strains. Full clinical ground truth (zone diameter in mm and S/I/R per antibiotic per isolate).
 
 Download: `python scripts/download_data.py`
 
