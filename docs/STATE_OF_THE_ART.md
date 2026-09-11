@@ -15,34 +15,60 @@ evaluators, potential collaborators, and as background for the BDIC 2026 submiss
 | **SIRscan** (i2a) | Same family as ADAGIO; used in the UZH Dryad validation dataset | Same hardware and cost constraints | Commercial, proprietary |
 | **VITEK 2** (bioMérieux) | Fluorescence-based AST, not disk diffusion; fastest turnaround in high-complexity labs | USD 80 000+ capital cost; not disk diffusion; requires continuous reagent supply | Commercial, proprietary |
 | **BD Phoenix** (Becton Dickinson) | Automated broth microdilution | USD 60 000+; same supply-chain dependency | Commercial, proprietary |
-| **Pascucci et al. 2021** (ASTimp, *Nat. Commun.*) | Smartphone app and C++/Python library for Kirby-Bauer reading; validated on clinical plates; source available at [github.com/mpascucci/AST-image-processing](https://github.com/mpascucci/AST-image-processing) | Halo measured as circle, not real contour; no per-antibiotic label reading in open implementation; no CLSI breakpoint integration; not maintained since 2022; Android-only app, no web/API interface | Apache 2.0, source public |
+| **Antibiogo** (Fondation MSF, built on ASTimp / Pascucci et al. 2021, *Nat. Commun.*) | Free, offline, open-source Android app for Kirby-Bauer reading. **CE-IVD marked since May 2022** (in-vitro diagnostic medical device certification) -- not a research prototype. Deployed in real MSF laboratory routine use (Jordan, DR Congo, and expanding to Mali, CAR, Yemen per Fondation MSF's own project page). Winner, Google AI Impact Challenge 2019. Source library (`astimp`, Apache 2.0) at [github.com/mpascucci/AST-image-processing](https://github.com/mpascucci/AST-image-processing) includes a trained Keras/TFLite model for reading the antibiotic name printed on each disk (`pellet_labels/`) and a benchmark suite with real clinical ground truth (mm + antibiotic + organism per disk) from Amman and Creteil laboratory data (`tests/benchmark/annotations/`, 205+ images referenced, though the images themselves are hosted separately and were not accessible to us) | Built for a WHONET/EUCAST-oriented workflow, not CLSI M100 or ISO 20776-2 as reported here; the underlying `astimp` library's own repository has had no code pushes since March 2021 (the certified app itself may have continued separately); ground-truth benchmark data seen references organisms and drug panels (Amman: *S. aureus*, gram-positive) outside BacterioScope's current gram-negative Enterobacteriaceae scope, so it is not directly reusable for this project's validation without separate gram-negative data; disk-label-reading model's real-world accuracy is not published in the open repository | Apache 2.0, source public (installation requires a C++ build via a shell script, not `pip install`); Antibiogo app itself is closed-distribution CE-marked software, not simply "the open-source library" |
 | **Webber et al. 2022** (*J Clin Microbiol*) | Clinical study validating early (6 h and 10 h) disk-diffusion readings against 24 h standard | Pure clinical validation, not a software tool; no automation; no open implementation | Published evidence base |
 
 ---
 
 ## The gap BacterioScope fills
 
-None of the systems above occupy the following combination simultaneously:
+**Correction to an earlier version of this document**: a previous draft claimed no
+existing system combines "open source and free" with "any camera". That claim does not
+survive contact with Antibiogo, which is exactly that combination, already CE-certified,
+and already running in real laboratories -- a materially more mature project than
+BacterioScope's current Phase 0. Overclaiming uniqueness against a system this well
+documented is a credibility risk in front of evaluators who may know it, not an
+advantage. The honest differentiation is narrower:
 
-1. **Open source and free** — no capital cost, no reagent lock-in, reproducible by any lab.
-2. **Any camera** — a smartphone or basic USB webcam is sufficient; no proprietary hardware.
-3. **CLSI M100-Ed33 2023 + ISO 20776-2 evaluation framework** — clinically validated
-   breakpoints and quality metrics, not a proprietary algorithm.
-4. **Early-reading roadmap** — Webber et al. (2022) demonstrated that readings at 6 h and
+1. **CLSI M100-Ed33 2023 + ISO 20776-2 evaluation framework** — Antibiogo's public
+   benchmark ground truth (Amman, Creteil) is oriented around a WHONET/EUCAST workflow;
+   BacterioScope targets CLSI M100, the standard used in Colombia and most of Latin
+   America. This is a real difference in target regulatory/clinical context, not a
+   claim that BacterioScope's algorithm is more accurate -- it is not yet validated to
+   be, and the honest F1-F3 findings in `docs/LIMITACIONES.md` should be read alongside
+   this document, not instead of it.
+2. **Colombian and Latin American regulatory/clinical context** — calibrated to the
+   resistance landscape (Klebsiella carbapenemase, ESKAPE priority pathogens) and
+   surveillance network (INS, ReLAVRA/PAHO) of low- and medium-complexity laboratories
+   in the region, and a path toward INVIMA rather than CE registration.
+3. **Early-reading roadmap** — Webber et al. (2022) demonstrated that readings at 6 h and
    10 h achieve ~97% categorical agreement with the 24 h standard (r > 0.98 for zone
-   diameters, zero Very Major Errors at 10 h).  BacterioScope is designed to automate
-   that reading window, reducing turnaround from overnight to same-shift.
-5. **Colombian and Latin American context** — calibrated to the resistance landscape
-   (Klebsiella carbapenemase, ESKAPE priority pathogens) and surveillance network (INS,
-   ReLAVRA/PAHO) of low- and medium-complexity laboratories that cannot sustain VITEK or
-   Phoenix infrastructure.
+   diameters, zero Very Major Errors at 10 h). Not yet implemented in BacterioScope, and
+   not confirmed either way whether Antibiogo does this -- listed as a roadmap direction,
+   not a current differentiator.
+4. **A from-scratch, independently reproducible open pipeline** — Antibiogo's Apache 2.0
+   library exists, but its own repository has had no code pushes since March 2021 and
+   requires a C++ build script to install, not `pip install`; its real accuracy against
+   the ground truth it ships is not published anywhere we found. BacterioScope publishes
+   its own accuracy numbers, good and bad, as they are measured (see
+   `docs/VALIDATION_REPORT.md`), which is itself worth stating plainly as a difference in
+   practice, not a claim of being more accurate.
+
+None of this makes BacterioScope more advanced than Antibiogo today. It is not. The
+honest position for evaluators is: BacterioScope is an earlier-stage, CLSI/Latin-America
+-oriented project in a space where a CE-certified, MSF-deployed system already exists,
+and its contribution so far is a rigorously measured, openly documented validation
+process rather than proven superior accuracy.
 
 ---
 
 ## What BacterioScope is not claiming
 
-- **Not the first to measure halos automatically.** AntibiogramJ and ADAGIO predate this
-  project.  The contribution is the combination above, not the measurement idea.
+- **Not the first to measure halos automatically, and not the most mature.**
+  AntibiogramJ and ADAGIO predate this project; Antibiogo is a CE-certified medical
+  device already deployed in MSF laboratories, well ahead of BacterioScope's current
+  Phase 0 state. The contribution here is the CLSI/Latin-America-specific framing and
+  an unusually transparent validation process, not a claim of being first or best.
 - **Not a replacement for VITEK in high-complexity settings.** Those labs have the budget
   and supply chain for gold-standard systems.  BacterioScope targets the labs that do not.
 - **Early reading is planned, not yet implemented.** The Webber 2022 evidence base makes
