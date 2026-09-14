@@ -23,6 +23,10 @@ data/models/single_class/
 .venv/
 venv/
 
+# External reference repository (Pascucci et al. ASTimp/Antibiogo, Apache 2.0) --
+# studied locally for prior-art comparison, not part of this project's own code.
+AST-image-processing-1.4/
+
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
