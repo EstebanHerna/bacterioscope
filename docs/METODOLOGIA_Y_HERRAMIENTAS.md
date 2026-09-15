@@ -144,7 +144,7 @@ The validation script compares BacterioScope zone diameters against SIRscan refe
 
 | Tool | Purpose | Configuration |
 |---|---|---|
-| `pytest` | Test runner | 258 tests, 95.3% line coverage, threshold 80% |
+| `pytest` | Test runner | 261 tests, 94.9% line coverage, threshold 80% |
 | `ruff` | Linting and import sort | `pyproject.toml [tool.ruff]` |
 | `mypy` | Static type checking | Strict mode, `pyproject.toml [tool.mypy]` |
 | `bandit` | Security scan | `pyproject.toml [tool.bandit]` |
@@ -174,3 +174,32 @@ Optional dependencies (installed with `pip install -e ".[all,dev]"`):
 | `api` | `fastapi`, `uvicorn`, `pydantic`, `httpx` | REST API |
 | `ui` | `streamlit` | Streamlit demo |
 | `dev` | `pytest`, `ruff`, `mypy`, `bandit`, etc. | Development toolchain |
+
+---
+
+## 12. AI tool usage declaration
+
+Claude Code (Anthropic) was used throughout development, under direct human
+direction from the project's technical lead, for: implementing and debugging
+the pipeline modules, running and interpreting the measurement validation
+described in this document, writing and revising this documentation, and
+maintaining `docs/LIMITACIONES.md` and `docs/VALIDATION_REPORT.md`.
+
+Every root cause described in this document and in `docs/LIMITACIONES.md`
+(the disk polluting the Otsu threshold, the circular dependency in disk-based
+calibration, the UZH dataset's square-plate mismatch, and others) was
+identified by measuring the actual pipeline against real data, not asserted
+from general knowledge -- the reproduction command for each such finding is
+given alongside it or in `docs/CIFRAS_PITCH_FINAL.md`. Every number in this
+document and in the validation reports was produced by running the cited
+script, not estimated.
+
+Commit authorship follows the project convention: commits are authored and
+attributed to the human team member who directed the work, without AI
+co-authorship lines, per this project's own policy (see `CLAUDE.md`, "Code
+standards"). One commit predating this policy's consistent application
+(`e7eb58a`, an already-merged and already-pushed Phase 3 detection fix)
+carries a `Co-Authored-By: Claude` trailer; rewriting it would require
+force-pushing over already-public history and was deliberately not done
+without explicit authorization -- the work it describes is unaffected and
+independently verifiable by running the tests and scripts it references.

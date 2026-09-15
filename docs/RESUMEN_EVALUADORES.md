@@ -16,7 +16,7 @@ Los sistemas automatizados alternativos (VITEK 2, BD Phoenix, MicroScan) cuestan
 
 ## La solución
 
-**BacterioScope** convierte una fotografía ordinaria de una placa Kirby-Bauer en un reporte S/I/R completo sin intervención humana, en segundos, usando únicamente una cámara y un computador estándar.
+**BacterioScope** busca convertir una fotografía ordinaria de una placa Kirby-Bauer en un reporte S/I/R completo sin intervención humana, usando únicamente una cámara y un computador estándar. Hoy detecta cada disco y mide el halo de forma automática y confiable; la identidad del antibiótico se resuelve manualmente o por posición de panel fijo, no por lectura automática de la etiqueta todavía — ver `docs/LIMITACIONES.md` sección 2.
 
 ```
 Fotografía de la placa (cualquier cámara)
@@ -76,7 +76,7 @@ El sistema está implementado en Python 3.10+ y opera en un pipeline modular:
 | Sistema de paneles (asignación automática por posición angular) | Completo |
 | Procesamiento por lotes con CSV de resultados y log de errores | Completo |
 | Instrumentación de rendimiento (tiempos por etapa en ms) | Completo |
-| Suite de pruebas | 258 pruebas, 95.3% de cobertura |
+| Suite de pruebas | 261 pruebas, 94.9% de cobertura |
 | CI (GitHub Actions) | Verde en Python 3.10, 3.11, 3.12 |
 
 **Limitación de Fase 0:** la detección usa círculos geométricos (sin aprendizaje automático) y el antibiótico se asigna manualmente en la UI o mediante un panel predefinido. La Fase 2 elimina ambas restricciones mediante YOLOv8.
