@@ -11,3 +11,8 @@ typer>=0.9
 rich>=13.0
 streamlit>=1.28
 PyYAML>=6.0
+# The package itself: without this, `src/bacterioscope/app.py` cannot
+# `import bacterioscope` on a fresh deploy (confirmed directly: running the
+# entry point with only the packages above installed, but not this line,
+# raises ModuleNotFoundError on the very first import).
+-e .

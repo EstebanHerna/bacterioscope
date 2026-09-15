@@ -514,8 +514,9 @@ def main() -> None:
         "<b>Validation status:</b> measurement accuracy on real clinical "
         "photographs does not yet meet the ISO 20776-2 / EUCAST target "
         "(Essential Agreement &ge;90%). Current identity-matched result on "
-        "the UZH real-photo reference set is well below that bar; synthetic "
-        "and controlled images perform much better. See "
+        "the UZH real-photo reference set: <b>EA 32.9%, MAE 6.28mm</b> (20 "
+        "images, 316 disk-antibiotic pairs) &mdash; well below that bar; "
+        "synthetic and controlled images perform much better. See "
         "<a href=\"https://github.com/EstebanHerna/bacterioscope/blob/main/"
         'docs/VALIDATION_REPORT.md" target="_blank">the full validation '
         "report</a> for numbers and root-cause analysis.</div>",

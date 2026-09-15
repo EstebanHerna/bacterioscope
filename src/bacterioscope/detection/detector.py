@@ -141,14 +141,22 @@ class DiskDetector:
     def _load_model(self) -> None:
         """Load the YOLOv8 model on first use (lazy initialisation).
 
-        If weights do not exist, sets ``_model`` to ``None`` so that
-        subsequent calls to ``detect()`` use the Hough fallback.
+        If weights do not exist, or the ``ultralytics`` package is not
+        installed, sets ``_model`` to ``None`` so that subsequent calls to
+        ``detect()`` use the Hough fallback instead of raising. This matters
+        for deployments that install only the ``ui`` extra (Streamlit
+        without ``ml``): a leftover weights file on disk must not turn a
+        missing optional dependency into a hard crash.
         """
         if self._model is not None:
             return
         if self.weights.exists():
             self._verify_weights(self.weights)
-            from ultralytics import YOLO
+            try:
+                from ultralytics import YOLO
+            except ImportError:
+                self._model = None
+                return
             self._model = YOLO(str(self.weights))
         else:
             self._model = None

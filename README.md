@@ -302,13 +302,16 @@ Annotated plate images are saved in `data/processed/validation_figures/`.
 
 ## Streamlit Community Cloud deployment
 
+**Live demo:** _not yet deployed — replace this line with the public URL once
+the app is connected on [share.streamlit.io](https://share.streamlit.io)._
+
 The repo ships deployment-ready configuration under `.streamlit/config.toml` and `requirements.txt`. To deploy:
 
 1. Push to a GitHub repository.
 2. Go to [share.streamlit.io](https://share.streamlit.io), connect the repo, and set the main file to `src/bacterioscope/app.py`.
-3. Streamlit Cloud installs `requirements.txt` automatically.
+3. Streamlit Cloud installs `requirements.txt` automatically (includes `-e .`, so the package itself installs correctly — verified directly: without it, the entry point fails with `ModuleNotFoundError` on a fresh install).
 
-The demo runs without YOLOv8 weights (falls back to HoughCircles). The built-in example image works immediately after deploy — no upload required to verify the deployment.
+The demo runs without YOLOv8 weights (falls back to HoughCircles) and without `ultralytics` installed at all (verified directly: a missing-weights-file case and a missing-`ultralytics`-package case both fall back cleanly, no crash). The built-in example image works immediately after deploy — no upload required to verify the deployment.
 
 ---
 
