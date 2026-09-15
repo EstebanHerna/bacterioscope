@@ -10,8 +10,23 @@ produces.
 A disk's zone mask filling nearly all of its own crop's bounding box is the
 confirmed signature (this project's Phase 3 findings) of measuring the crop
 edge, not a real inhibition-zone edge. Combined with the existing quality
-flags (``overlap``, ``low_circularity``, ``boundary``, ``small_zone``), this
-gives a per-disk trust classification without inventing a new metric.
+flags (``overlap``, ``low_circularity``, ``boundary``, ``small_zone``,
+``crop_boundary``), this gives a per-disk trust classification without
+inventing a new metric.
+
+Two separate bars are reported, on purpose, not one:
+
+- ``is_trustworthy`` (fill ratio < 0.90, no flags) matches the pipeline's own
+  ``crop_boundary`` flag -- validated statistically (measured EA improves
+  from 32.9% to 42.8% on the kept set, see ``measure_confidence_indicator.py``).
+  This answers "should this specific measurement be trusted scientifically".
+- ``is_presentable`` (fill ratio < 0.80, no flags) is a visibly stricter bar
+  for a different question: "will this look like a clean biological contour
+  on a slide, not a square". Found necessary directly: several disks that
+  pass the 0.90 trust bar (fill ratio in the high 0.80s) still show a
+  visibly square contour in the annotated output. Conflating the two bars
+  previously led to recommending images that were statistically defensible
+  but not visually presentable -- do not collapse them back into one number.
 
 Usage::
 
@@ -42,12 +57,14 @@ from bacterioscope.utils.image import resize_canonical  # noqa: E402
 from bacterioscope.utils.visualization import draw_results  # noqa: E402
 
 _FILL_RATIO_TRUST_CEILING = 0.90
+_FILL_RATIO_PRESENTABLE_CEILING = 0.80
+_MIN_PRESENTABLE_FRACTION = 0.30
 _UZH_COUNT = 20
 
 
 @dataclass
 class DiskAssessment:
-    """Trust assessment for one measured disk."""
+    """Trust and presentability assessment for one measured disk."""
 
     image_name: str
     disk_index: int
@@ -56,6 +73,7 @@ class DiskAssessment:
     fill_ratio: float
     flags: list[str]
     is_trustworthy: bool
+    is_presentable: bool
 
 
 def _survey_images() -> list[str]:
@@ -84,7 +102,6 @@ def _assess_disk(image_name: str, idx: int, result: AnalysisResult) -> DiskAsses
     if fill_ratio is None:
         return None
     flags = result.flags[idx] if result.flags else []
-    is_trustworthy = fill_ratio < _FILL_RATIO_TRUST_CEILING and not flags
     return DiskAssessment(
         image_name=image_name,
         disk_index=idx,
@@ -92,7 +109,8 @@ def _assess_disk(image_name: str, idx: int, result: AnalysisResult) -> DiskAsses
         diameter_mm=zone.diameter_mm,
         fill_ratio=fill_ratio,
         flags=flags,
-        is_trustworthy=is_trustworthy,
+        is_trustworthy=fill_ratio < _FILL_RATIO_TRUST_CEILING and not flags,
+        is_presentable=fill_ratio < _FILL_RATIO_PRESENTABLE_CEILING and not flags,
     )
 
 
@@ -102,31 +120,26 @@ def _write_report(assessments: list[DiskAssessment], output_dir: Path) -> None:
         writer = csv.writer(fh)
         writer.writerow(
             ["image", "disk_index", "antibiotic", "diameter_mm",
-             "fill_ratio", "flags", "trustworthy"]
+             "fill_ratio", "flags", "trustworthy", "presentable"]
         )
         for a in assessments:
             writer.writerow(
                 [a.image_name, a.disk_index, a.antibiotic, round(a.diameter_mm, 1),
-                 round(a.fill_ratio, 3), ";".join(a.flags), a.is_trustworthy]
+                 round(a.fill_ratio, 3), ";".join(a.flags), a.is_trustworthy, a.is_presentable]
             )
     print(f"Per-disk report: {path}")
 
 
-def _image_score(assessments: list[DiskAssessment]) -> tuple[int, int]:
-    trusted = sum(1 for a in assessments if a.is_trustworthy)
-    return trusted, len(assessments)
+def _presentable_score(assessments: list[DiskAssessment]) -> tuple[int, int]:
+    presentable = sum(1 for a in assessments if a.is_presentable)
+    return presentable, len(assessments)
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output-dir", type=Path, default=Path("data/processed/pitch_candidates"))
-    args = parser.parse_args()
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-
-    pipeline = BacterioScopePipeline(PipelineConfig())
+def _run_survey(
+    pipeline: BacterioScopePipeline,
+) -> tuple[list[DiskAssessment], dict[str, tuple[AnalysisResult, list[DiskAssessment]]]]:
     all_assessments: list[DiskAssessment] = []
     per_image: dict[str, tuple[AnalysisResult, list[DiskAssessment]]] = {}
-
     for path in _survey_images():
         name = Path(path).name
         try:
@@ -140,46 +153,71 @@ def main() -> int:
         ]
         all_assessments.extend(image_assessments)
         per_image[name] = (result, image_assessments)
+    return all_assessments, per_image
 
+
+def _report_ranking(
+    ranked: list[tuple[str, tuple[AnalysisResult, list[DiskAssessment]]]],
+) -> None:
+    print("\nImages ranked by presentable-disk count (the bar for a pitch slide, best first):")
+    for name, (_, assessments) in ranked[:10]:
+        presentable, total = _presentable_score(assessments)
+        print(f"  {name}: {presentable}/{total} disks presentable")
+
+
+def _report_best_single_disk(all_assessments: list[DiskAssessment]) -> None:
+    presentable_disks = [a for a in all_assessments if a.is_presentable]
+    if not presentable_disks:
+        print("\nNo single disk in the whole survey clears the presentability bar.")
+        return
+    best = min(presentable_disks, key=lambda a: a.fill_ratio)
+    print(
+        f"Best single presentable disk: {best.image_name} disk_{best.disk_index} "
+        f"({best.antibiotic}, {best.diameter_mm:.1f}mm, fill_ratio={best.fill_ratio:.2f})"
+    )
+
+
+def _save_annotated(
+    name: str, result: AnalysisResult, output_dir: Path,
+) -> Path:
+    image = cv2.imread(str(Path("examples/real" if "real_plate" in name else
+                                 "data/raw/dryad_uzh/images_original") / name))
+    image, _ = resize_canonical(image)
+    annotated = draw_results(
+        image.copy(), result.disks, result.zones, result.classifications, result.flags,
+    )
+    out_path = output_dir / f"annotated_{Path(name).stem}.png"
+    cv2.imwrite(str(out_path), annotated)
+    return out_path
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output-dir", type=Path, default=Path("data/processed/pitch_candidates"))
+    args = parser.parse_args()
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+
+    pipeline = BacterioScopePipeline(PipelineConfig())
+    all_assessments, per_image = _run_survey(pipeline)
     _write_report(all_assessments, args.output_dir)
 
-    ranked = sorted(
-        per_image.items(),
-        key=lambda kv: _image_score(kv[1][1]),
-        reverse=True,
-    )
-    print("\nImages ranked by trustworthy-disk count (best first):")
-    for name, (_, assessments) in ranked[:10]:
-        trusted, total = _image_score(assessments)
-        print(f"  {name}: {trusted}/{total} disks trustworthy")
+    ranked = sorted(per_image.items(), key=lambda kv: _presentable_score(kv[1][1]), reverse=True)
+    _report_ranking(ranked)
 
-    def _is_fully_trustworthy(assessments: list[DiskAssessment]) -> bool:
-        trusted, total = _image_score(assessments)
-        return total > 0 and trusted == total
+    print("\nRecommended for the pitch (presentable fraction "
+          f">= {_MIN_PRESENTABLE_FRACTION:.0%}) -- do not use anything not listed here:")
+    recommended = []
+    for name, (result, assessments) in ranked:
+        presentable, total = _presentable_score(assessments)
+        if total == 0 or presentable / total < _MIN_PRESENTABLE_FRACTION:
+            continue
+        recommended.append(name)
+        out_path = _save_annotated(name, result, args.output_dir)
+        print(f"  {name}: {presentable}/{total} presentable -> {out_path}")
+    if not recommended:
+        print("  None. No image clears the presentability bar for a full panel.")
 
-    best_full_panel = next(
-        (r for r in ranked if _is_fully_trustworthy(r[1][1])), None,
-    )
-    if best_full_panel is None:
-        print("\nNo image gives a fully defensible panel (every disk trustworthy).")
-        best_single = max(all_assessments, key=lambda a: (a.is_trustworthy, -a.fill_ratio))
-        print(
-            f"Best single defensible disk: {best_single.image_name} disk_{best_single.disk_index} "
-            f"({best_single.antibiotic}, {best_single.diameter_mm:.1f}mm, "
-            f"fill_ratio={best_single.fill_ratio:.2f}, flags={best_single.flags or 'none'})"
-        )
-
-    for name, (result, _) in ranked[:3]:
-        image = cv2.imread(str(Path("examples/real" if "real_plate" in name else
-                                     "data/raw/dryad_uzh/images_original") / name))
-        image, _ = resize_canonical(image)
-        annotated = draw_results(
-            image.copy(), result.disks, result.zones, result.classifications, result.flags,
-        )
-        out_path = args.output_dir / f"annotated_{Path(name).stem}.png"
-        cv2.imwrite(str(out_path), annotated)
-        print(f"Saved annotated candidate: {out_path}")
-
+    _report_best_single_disk(all_assessments)
     return 0
 
 
