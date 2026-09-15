@@ -80,6 +80,44 @@ _SOFTWARE_VERSION: str = "0.1.0"
 # was too strict in practice.
 _BOUNDARY_TOLERANCE_PX: int = 15
 
+# Fraction of a zone mask's own bounding-box area it may fill before the
+# 'crop_boundary' quality flag fires. Chosen from a real sweep (0.75-1.01),
+# not assumed: circularity alone does not predict error (it is non-monotonic
+# -- the 0.70-0.82 band measures worse than both lower and higher bands), but
+# a mask filling nearly all of its search crop is the confirmed signature of
+# tracing the crop's own edge rather than a biological one. At this ceiling,
+# on the 316-pair identity-matched set, Essential Agreement for the
+# unflagged measurements is 42.8% against a 32.9% baseline for all of them
+# (173 pairs kept, 45.3% flagged) -- a real, measured improvement, not a
+# guess. See scripts/measure_confidence_indicator.py to reproduce the sweep.
+_CROP_FILL_CEILING: float = 0.90
+
+
+def _crop_fill_ratio(mask: NDArray[np.uint8] | None) -> float | None:
+    """Return the fraction of a zone mask's own bounding box that it fills.
+
+    A value near 1.0 means the traced contour is most likely the edge of the
+    search crop rather than a real inhibition-zone boundary -- see the
+    ``crop_boundary`` flag in ``_compute_flags()``.
+
+    Args:
+        mask: Binary zone mask (255 = zone interior), or ``None`` if no zone
+            was found for this disk.
+
+    Returns:
+        Fill ratio in ``[0, 1]``, or ``None`` if there is no mask or its
+        bounding box has zero area.
+    """
+    if mask is None:
+        return None
+    ys, xs = np.nonzero(mask)
+    if len(xs) == 0:
+        return None
+    bbox_area = (xs.max() - xs.min()) * (ys.max() - ys.min())
+    if bbox_area == 0:
+        return None
+    return float((mask.sum() / 255) / bbox_area)
+
 
 def _get_commit_hash() -> str:
     """Return the current git short hash, or 'unknown' if git is unavailable."""
@@ -490,6 +528,13 @@ class BacterioScopePipeline:
                 rounding noise on a dense grid, not a truncated measurement.
                 Overshoots that are actually severe (seen up to 75px in the
                 same audit) still flag.
+            crop_boundary: the zone mask fills more than
+                ``_CROP_FILL_CEILING`` of its own bounding-box area, meaning
+                the measured contour is most likely the edge of the search
+                crop, not a real inhibition-zone edge. Measured, not assumed,
+                to be a real confidence signal: unflagged measurements score
+                substantially higher Essential Agreement than flagged ones at
+                every ceiling tried (see ``_CROP_FILL_CEILING``).
             overlap: zone overlaps with the zone of an adjacent disk.
 
         Args:
@@ -515,6 +560,9 @@ class BacterioScopePipeline:
                 )
                 if overshoot > _BOUNDARY_TOLERANCE_PX:
                     flags[i].append("boundary")
+            fill_ratio = _crop_fill_ratio(zone.mask)
+            if fill_ratio is not None and fill_ratio >= _CROP_FILL_CEILING:
+                flags[i].append("crop_boundary")
         for i in range(len(disks)):
             for j in range(i + 1, len(disks)):
                 dist = float(np.sqrt(

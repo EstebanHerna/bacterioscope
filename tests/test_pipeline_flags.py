@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import cv2
 import numpy as np
 import pytest
 
@@ -131,3 +132,43 @@ class TestComputeFlagsOverlap:
     def test_no_disks_returns_empty(self, pipeline: BacterioScopePipeline) -> None:
         flags = pipeline._compute_flags([], [], (400, 400, 3))
         assert flags == []
+
+
+def _square_mask(size: int = 400, x0: int = 100, y0: int = 100, side: int = 150) -> np.ndarray:
+    """A mask that exactly fills its own bounding box (fill ratio ~1.0)."""
+    mask = np.zeros((size, size), dtype=np.uint8)
+    mask[y0:y0 + side, x0:x0 + side] = 255
+    return mask
+
+
+def _circle_mask(size: int = 400, cx: int = 200, cy: int = 200, r: int = 75) -> np.ndarray:
+    """A mask tracing a real circle (fill ratio ~pi/4, matching a clean edge)."""
+    mask = np.zeros((size, size), dtype=np.uint8)
+    cv2.circle(mask, (cx, cy), r, 255, -1)
+    return mask
+
+
+class TestComputeFlagsCropBoundary:
+    """crop_boundary fires when the zone mask fills nearly all of its own
+    bounding box -- the confirmed signature of tracing the search crop's own
+    edge rather than a real inhibition-zone edge. See _CROP_FILL_CEILING for
+    the measured evidence behind the threshold.
+    """
+
+    def test_flag_when_mask_fills_its_bbox(self, pipeline: BacterioScopePipeline) -> None:
+        zone = _zone()
+        zone.mask = _square_mask()
+        flags = pipeline._compute_flags([_disk()], [zone], (400, 400, 3))
+        assert "crop_boundary" in flags[0]
+
+    def test_no_flag_for_a_real_circular_contour(self, pipeline: BacterioScopePipeline) -> None:
+        zone = _zone()
+        zone.mask = _circle_mask()
+        flags = pipeline._compute_flags([_disk()], [zone], (400, 400, 3))
+        assert "crop_boundary" not in flags[0]
+
+    def test_no_flag_and_no_crash_when_mask_is_none(self, pipeline: BacterioScopePipeline) -> None:
+        zone = _zone()
+        assert zone.mask is None
+        flags = pipeline._compute_flags([_disk()], [zone], (400, 400, 3))
+        assert "crop_boundary" not in flags[0]
