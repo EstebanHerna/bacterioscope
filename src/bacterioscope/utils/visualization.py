@@ -144,6 +144,56 @@ def draw_results(
     return image
 
 
+_CLEAN_STROKE_COLOR: tuple[int, int, int] = (240, 240, 240)   # near-white, BGR
+_CLEAN_TEXT_OUTLINE_COLOR: tuple[int, int, int] = (20, 20, 20)  # dark outline, BGR
+
+
+def draw_results_clean(
+    image: NDArray[np.uint8],
+    disks: list[DiskResult],
+    zones: list[ZoneResult],
+    flags: list[list[str]] | None = None,
+) -> NDArray[np.uint8]:
+    """Overlay a presentation-clean annotation: contour, disk circle, flag
+    ring and a bare millimetre label -- no antibiotic name or S/I/R text.
+
+    ``draw_results()``'s full label ("antibiotic: mm (category)") is either
+    redundant with a nearby results table or, when no panel has resolved
+    antibiotic identity, prints a confusing "(UNKNOWN)" on every disk. This
+    variant is for output a non-technical audience looks at directly (the
+    plate report's hero image); colour here carries no clinical meaning, it
+    only marks the same flagged/unflagged distinction as draw_results().
+
+    Args:
+        image: BGR image array to annotate. Pass a ``.copy()`` to preserve
+            the original.
+        disks: One DiskResult per detected disk.
+        zones: One ZoneResult per disk -- contour, radius and diameter_mm.
+        flags: Optional list of flag lists, one per disk. Flagged disks
+            receive an amber warning ring, same convention as draw_results().
+
+    Returns:
+        The annotated BGR image (same array that was passed in).
+    """
+    for idx, (disk, zone) in enumerate(zip(disks, zones)):
+        disk_flags = flags[idx] if flags is not None and idx < len(flags) else []
+        if disk_flags:
+            _draw_flag_ring(image, zone)
+
+        _draw_zone_contour(image, zone, _CLEAN_STROKE_COLOR)
+        cv2.circle(image, (disk.center_x, disk.center_y), disk.radius_px, _CLEAN_STROKE_COLOR, 1)
+
+        label = f"{zone.diameter_mm:.1f} mm"
+        origin = (disk.center_x - 26, disk.center_y - int(disk.radius_px) - 10)
+        cv2.putText(image, label, origin, cv2.FONT_HERSHEY_SIMPLEX, 0.42,
+                    _CLEAN_TEXT_OUTLINE_COLOR, 3, cv2.LINE_AA)
+        cv2.putText(image, label, origin, cv2.FONT_HERSHEY_SIMPLEX, 0.42,
+                    _CLEAN_STROKE_COLOR, 1, cv2.LINE_AA)
+
+    stamp_watermark(image)
+    return image
+
+
 def stamp_watermark(image: NDArray[np.uint8]) -> None:
     """Stamp a solid marker block in the top-left corner, in place.
 

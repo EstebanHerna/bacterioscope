@@ -65,7 +65,7 @@ CLAHE contrast enhancement exists as an option (`use_clahe`) but is not exposed 
 
 Breakpoints are from **CLSI M100, 33rd edition (2023)**, Table 2A (Enterobacteriaceae, disk diffusion). The current table covers 15 antibiotics:
 
-Ampicillin, Ampicillin-sulbactam, Piperacillin-tazobactam, Cefazolin, Cefoxitin, Ceftriaxone, Ceftazidime, Cefepime, Aztreonam, Ertapenem, Imipenem, Meropenem, Gentamicin, Ciprofloxacin, Trimethoprim-sulfamethoxazole.
+Ampicillin, Amoxicillin-clavulanate, Piperacillin-tazobactam, Ceftriaxone, Ceftazidime, Cefepime, Ertapenem, Imipenem, Meropenem, Doripenem, Gentamicin, Amikacin, Ciprofloxacin, Levofloxacin, Trimethoprim-sulfamethoxazole (`classification/clsi.py::CLSI_2023_ENTEROBACTERIACEAE`, the list to check against directly if this document and the code ever drift apart again).
 
 Each antibiotic entry stores `S` (susceptible) and `R` (resistant) zone diameter thresholds in mm. Classification logic:
 

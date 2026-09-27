@@ -38,6 +38,7 @@ from bacterioscope.design.tokens import (
     SPACE,
     palette,
 )
+from bacterioscope.utils.visualization import draw_results_clean
 
 if TYPE_CHECKING:
     from bacterioscope.pipeline import AnalysisResult
@@ -351,18 +352,34 @@ def _build_rows(result: AnalysisResult) -> str:
     return "".join(rows)
 
 
-def _section_plate_image(result: AnalysisResult) -> str:
-    img_src = (
+def _plate_image_b64(result: AnalysisResult) -> str:
+    """Render the clean, presentation-ready annotation when possible.
+
+    Draws a fresh minimal overlay (contour, disk circle, mm label, flag
+    ring) on the unannotated photo. Falls back to whatever pre-annotated
+    image the result already carries when the original photo is missing --
+    it cannot be un-annotated, so it is shown as-is rather than redrawn on
+    top of itself.
+    """
+    if result.original_image is not None and result.disks:
+        annotated = draw_results_clean(
+            result.original_image.copy(), result.disks, result.zones, result.flags
+        )
+        return _image_to_b64(annotated)
+    fallback = (
         result.annotated_image if result.annotated_image is not None else result.original_image
     )
+    return _image_to_b64(fallback) if fallback is not None else ""
+
+
+def _section_plate_image(result: AnalysisResult) -> str:
     img_html = ""
-    if img_src is not None:
-        b64 = _image_to_b64(img_src)
-        if b64:
-            img_html = (
-                f'<img class="plate" src="data:image/png;base64,{b64}"'
-                f' alt="Annotated plate">'
-            )
+    b64 = _plate_image_b64(result)
+    if b64:
+        img_html = (
+            f'<img class="plate" src="data:image/png;base64,{b64}"'
+            f' alt="Annotated plate">'
+        )
     width_px = _scale_bar_width_px(result.px_per_mm)
     scale_bar = (
         '<div class="scale-bar">'

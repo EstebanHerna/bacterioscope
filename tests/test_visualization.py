@@ -8,7 +8,7 @@ import numpy as np
 from bacterioscope.classification.clsi import SusceptibilityResult
 from bacterioscope.detection.detector import DiskResult
 from bacterioscope.segmentation.watershed import ZoneResult
-from bacterioscope.utils.visualization import draw_results, has_watermark
+from bacterioscope.utils.visualization import draw_results, draw_results_clean, has_watermark
 
 
 def _make_disk(cx: int = 100, cy: int = 100, r: int = 15) -> DiskResult:
@@ -124,3 +124,54 @@ class TestWatermark:
     def test_tiny_image_does_not_crash(self) -> None:
         img = np.zeros((3, 3, 3), dtype=np.uint8)
         assert has_watermark(img) in (True, False)
+
+
+class TestDrawResultsClean:
+    def test_returns_same_array(self) -> None:
+        img = np.zeros((300, 300, 3), dtype=np.uint8)
+        out = draw_results_clean(img, [_make_disk()], [_make_zone()])
+        assert out is img
+
+    def test_modifies_image_when_disk_present(self) -> None:
+        img = np.zeros((300, 300, 3), dtype=np.uint8)
+        original = img.copy()
+        draw_results_clean(img, [_make_disk()], [_make_zone()])
+        assert not np.array_equal(img, original)
+
+    def test_no_antibiotic_or_category_text(self) -> None:
+        # No panel resolves the disk's identity here (label stays "disk_0"
+        # and there is no classification), yet the clean overlay must not
+        # need either -- only the contour, disk circle and mm label.
+        img = np.zeros((300, 300, 3), dtype=np.uint8)
+        draw_results_clean(img, [_make_disk()], [_make_zone()])
+        assert img.any()
+
+    def test_fallback_circle_when_no_mask(self) -> None:
+        img = np.zeros((300, 300, 3), dtype=np.uint8)
+        draw_results_clean(img, [_make_disk()], [_make_zone(mask=None)])
+        assert img.any()
+
+    def test_flagged_disk_draws_extra_ring(self) -> None:
+        img_flagged = np.zeros((300, 300, 3), dtype=np.uint8)
+        img_clean = np.zeros((300, 300, 3), dtype=np.uint8)
+        draw_results_clean(img_flagged, [_make_disk()], [_make_zone()],
+                            flags=[["low_circularity"]])
+        draw_results_clean(img_clean, [_make_disk()], [_make_zone()], flags=[[]])
+        assert not np.array_equal(img_flagged, img_clean)
+
+    def test_flags_none_behaves_like_empty(self) -> None:
+        img_none = np.zeros((300, 300, 3), dtype=np.uint8)
+        img_empty = np.zeros((300, 300, 3), dtype=np.uint8)
+        draw_results_clean(img_none, [_make_disk()], [_make_zone()], flags=None)
+        draw_results_clean(img_empty, [_make_disk()], [_make_zone()], flags=[[]])
+        assert np.array_equal(img_none, img_empty)
+
+    def test_stamps_watermark(self) -> None:
+        img = np.zeros((300, 300, 3), dtype=np.uint8)
+        draw_results_clean(img, [_make_disk()], [_make_zone()])
+        assert has_watermark(img)
+
+    def test_no_disks_returns_unchanged_shape(self) -> None:
+        img = np.zeros((300, 300, 3), dtype=np.uint8)
+        out = draw_results_clean(img, [], [])
+        assert out.shape == (300, 300, 3)
