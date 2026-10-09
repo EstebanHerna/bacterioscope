@@ -9,7 +9,7 @@ validation and development.
 
 | Source | Images | Standard | License | Status |
 |---|---|---|---|---|
-| Dryad/UZH SIRscan | ~862 phenotypic categories, 225 isolates | EUCAST 2023 | CC0 1.0 | Available via download script |
+| Dryad/UZH SIRscan | 225 isolates, measurements and phenotype summaries | EUCAST (edition discrepancy unresolved) | CC0 1.0 | Measurement docs present; phenotype workbook role unverified |
 | ASTimp (Pascucci 2021) | Test images (variable) | None (visual only) | Apache 2.0 | Available via import script |
 | ASTIMP Roboflow | ~108+ annotated plates | None | CC BY 4.0 | Requires API key |
 
@@ -18,28 +18,50 @@ validation and development.
 ## Dryad/UZH SIRscan Dataset
 
 **Citation:**
-Egli A, Imkamp F, Amlang G, Brunner S, Albrich W, et al. (2023).
-Automated reading of disk diffusion antibiograms.
+Giske CG, Bressan M, Fiechter F, Hinic V, Mancini S, Nolte O, Egli A (2024).
+Image dataset of disk diffusion assay scanned with the SIRscan system.
 Dryad Digital Repository. doi:10.5061/dryad.5dv41nsfj
 
 **Access:** https://datadryad.org/dataset/doi:10.5061/dryad.5dv41nsfj
 
 **License:** Creative Commons Zero v1.0 Universal (CC0) — no restrictions.
 
-**Content:** 225 Gram-negative clinical isolates, 862 phenotypic categories.
-Reference measurements were produced by the SIRscan automated reader (i2a)
-using EUCAST 2023 breakpoints.
+**Content:** 225 Gram-negative isolates and 862 valid phenotypic categories in
+the associated study. The Dryad record says `Tables.zip` contains
+`Tables/measurements.csv`, but the archive supplied in the project has 450
+DOCX files and one actual XLSX workbook, with no CSV. The workbook is named
+`Overview GPT JCM.xlsx`; its yes/no phenotype counts differ from the paper's
+routine-diagnostic reference counts. Its role may be model output but remains
+unconfirmed. The extractor retains its values as unverified
+`source_reported_codes`, not reference labels. `Combination` remains
+unspecified; this project does not expand it or infer missing mechanisms.
 
-**Scope in BacterioScope:** Measurement accuracy validation only (zone diameter
-in mm). S/I/R classification is not validated against this dataset because
-BacterioScope uses CLSI 2023 breakpoints, which differ from EUCAST 2023 for
-several antibiotic-organism combinations. See `docs/LIMITACIONES.md`.
+**Standard provenance:** the dataset page describes EUCAST methods. Its README
+reports EUCAST 2022, while older repository notes/config report EUCAST 2023.
+Keep this discrepancy visible until the downloaded archive README and primary
+paper are reconciled. Dataset labels retain EUCAST provenance.
+
+**Scope in BacterioScope:** The per-isolate DOCX tables can support
+identity-matched zone-measurement comparisons after source parsing and image
+joins. The workbook phenotype flags are not an evaluation target until Dryad
+or the authors confirm their semantics. S/I/R classification is not validated
+against this dataset because BacterioScope uses CLSI M100-Ed33 (2023), whereas
+the data are EUCAST-derived. See `docs/LIMITACIONES.md` and
+`docs/PERSON_2_RULE_SPEC.md`.
 
 **Download:**
 ```bash
 python scripts/download_data.py
 python scripts/prepare_dataset.py --data-dir data/raw/dryad_uzh
+python scripts/extract_uzh_phenotypes.py --input data/raw/dryad_uzh/Tables.zip
 ```
+
+Dryad currently requires its accepted download flow. `scripts/prepare_dataset.py`
+parses the per-isolate DOCX measurement tables. The Persona 2 extractor reads a
+documented `measurements.csv` if present; for the current workbook fallback it
+records indicators but leaves `reference_label_codes` empty pending provenance
+clarification. It writes `data/processed/uzh_phenotype_labels.csv`; this
+generated CSV is ignored by Git.
 
 ---
 

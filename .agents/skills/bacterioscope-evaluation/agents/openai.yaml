@@ -1,0 +1,3 @@
+interface:
+  display_name: "Bacterioscope Evaluation"
+  short_description: "Evaluate data, agent behavior, and user tasks"

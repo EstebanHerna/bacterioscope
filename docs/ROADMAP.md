@@ -51,7 +51,7 @@ Prepare a clean, labelled training and validation set from the Dryad/UZH public 
 
 ### Dataset
 
-**Dryad/UZH (Egli et al., 2023):** 225 Gram-negative clinical isolates, 862 phenotypic categories. Includes ESBL, AmpC, and carbapenemase-producing strains. Full clinical ground truth (zone diameter in mm and S/I/R per antibiotic per isolate).
+**Dryad/UZH (Giske et al., 2024):** 225 Gram-negative isolates and 862 phenotypic categories. Per-isolate DOCX tables provide SIRscan measurements for zone-diameter work. Dryad's record documents a `measurements.csv`, but the supplied archive lacks it and instead includes `Overview GPT JCM.xlsx`; the workbook's phenotype role is unverified and its counts differ from the paper's routine-diagnostic reference counts. Do not use those workbook indicators as ground truth until clarified. The data are EUCAST/SIRscan provenance, not CLSI truth; edition notes also need reconciliation.
 
 Download: `python scripts/download_data.py`
 

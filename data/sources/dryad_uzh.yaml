@@ -1,17 +1,35 @@
 name: dryad_uzh
 display_name: "Dryad/UZH SIRscan Dataset"
 path: data/raw/dryad_uzh
-format: csv
+format: zip_with_source_workbook
 standard: EUCAST
+standard_version: "Unreconciled: dataset README says 2022; existing project notes say 2023"
 license: "Creative Commons Zero v1.0 Universal (CC0)"
 license_url: "https://creativecommons.org/publicdomain/zero/1.0/"
 citation: >
-  Egli A, Imkamp F, Amlang G, Brunner S, Albrich W, et al. (2023).
-  Automated reading of disk diffusion antibiograms.
+  Giske CG, Bressan M, Fiechter F, Hinic V, Mancini S, Nolte O, Egli A (2024).
+  Image dataset of disk diffusion assay scanned with the SIRscan system.
   Dryad Digital Repository. doi:10.5061/dryad.5dv41nsfj
+expected_measurement_asset: Tables/measurements.csv
+observed_label_asset: Overview GPT JCM.xlsx
+observed_identifier_column: Image
+observed_organism_column: SPECIES
+observed_phenotype_indicator_columns:
+  - "None (Y/N)"
+  - "ESBL (Y/N)"
+  - "AMPC (Y/N)"
+  - "CARBAPENEMASE (Y/N)"
+observed_workbook_author: "Adrian Egli (workbook metadata)"
+observed_tables_zip_sha256: "ffeb440d482be894d582efaf5b3417b6f003ce3119a43c3bb1a1bedec2b532d7"
+phenotype_labels: [NO_MECHANISM_REPORTED, ESBL, AMPC, CARBAPENEMASE]
 n_isolates: 225
 n_phenotypic_categories: 862
 notes: >
-  225 Gram-negative clinical isolates. Reference measurements produced by
-  the SIRscan automated reader using EUCAST 2023 breakpoints.
-  Download: python scripts/download_data.py
+  The Dryad README describes a measurements.csv in Tables.zip, but the supplied
+  Tables.zip has no CSV. It contains an Overview GPT JCM.xlsx with 225 image IDs,
+  organism names, and explicit yes/no phenotype indicators; source IDs map to
+  all 225 original image names after trimming a trailing period. The extractor
+  preserves raw indicators and non-binary statuses. Treat its labels as
+  source-reported and exploratory, not as CLSI truth. Dryad declares CC0 1.0.
+  EUCAST version remains unreconciled between repository notes (2023) and the
+  dataset README (2022).

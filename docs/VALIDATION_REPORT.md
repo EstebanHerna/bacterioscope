@@ -1,14 +1,15 @@
 # BacterioScope Validation Report
 
-> Dataset: Egli et al. (2023) / University of Zurich SIRscan.
+> Dataset: Giske et al. (2024) / University of Zurich SIRscan.
 > doi:10.5061/dryad.5dv41nsfj
+> Edition note: this report's prior notes say EUCAST 2023; the dataset README reports EUCAST 2022. The current measurements below use zone diameters only, but reconcile the edition before any categorical analysis.
 
 ## Scope and limitations
 
 This report validates **zone-diameter measurement accuracy only** (mm vs SIRscan reference).
 S/I/R classification is **not** compared because:
 
-- The UZH reference uses **EUCAST 2023** breakpoints (SIRscan automated reader).
+- The prior validation record labels the UZH reference **EUCAST 2023**; the dataset README reports **EUCAST 2022**. Do not treat that edition as reconciled.
 - BacterioScope classifies using **CLSI M100-Ed33 2023** breakpoints.
 - EUCAST and CLSI thresholds differ for many antibiotic-organism combinations (e.g. ciprofloxacin S: EUCAST >= 25 mm vs CLSI >= 26 mm for Enterobacteriaceae).
 - Comparing S/I/R across standards produces misleading discordance rates.
@@ -25,8 +26,8 @@ Two strategies are reported, clearly separated below: **identity matching** (eac
 
 | Item | Value |
 |---|---|
-| Dataset | University of Zurich SIRscan (Egli et al., 2023) |
-| Reference system | SIRscan automated reader (EUCAST 2023) |
+| Dataset | University of Zurich SIRscan (Giske et al., 2024) |
+| Reference system | SIRscan automated reader (EUCAST edition unresolved) |
 | Total images evaluated | 80 |
 | Images with matching disk count | 59 |
 | Disk-antibiotic pairs used for EA | 944 |
