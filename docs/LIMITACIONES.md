@@ -18,11 +18,12 @@ The current validation (Phase 0) measures zone diameters in millimetres and
 computes Essential Agreement (EA), Mean Absolute Error (MAE), and Pearson r
 against a reference dataset. It does **not** validate S/I/R categorical accuracy.
 
-**Why:** The reference dataset (Dryad/UZH) uses EUCAST 2023 breakpoints from the
-SIRscan automated reader. BacterioScope classifies using CLSI M100-Ed33 2023
-breakpoints. EUCAST and CLSI breakpoints differ for several antibiotic-organism
-combinations. Comparing S/I/R categories across these two standards produces
-misleading error rates that reflect the standard difference, not system performance.
+**Why:** Older repository validation notes identify the reference as EUCAST 2023,
+while the Dryad dataset README reports EUCAST 2022. That edition discrepancy is
+unresolved. BacterioScope classifies using CLSI M100-Ed33 2023 breakpoints.
+EUCAST and CLSI criteria differ for several antibiotic-organism combinations.
+Comparing S/I/R categories across these standards produces misleading error
+rates that reflect the standard difference, not system performance.
 
 **Consequence:** The system's categorical accuracy (CA), Very Major Error (VME),
 and Major Error (ME) rates have not been validated against a CLSI-annotated

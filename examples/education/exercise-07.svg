@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-labelledby="title desc">
+  <title id="title">Exercise 07: recognize a cropped capture</title><desc id="desc">A synthetic plate and zone are cut by the left edge of the captured image. A diameter answer is unavailable.</desc>
+  <rect width="600" height="600" fill="#f6f7f3"/><text x="360" y="28" text-anchor="middle" font-family="sans-serif" font-size="17" fill="#24332e">Practice — decide whether this case is gradable</text>
+  <circle cx="350" cy="275" r="250" fill="#e8e4d4" stroke="#74796e" stroke-width="3"/><circle cx="140" cy="275" r="66.667" fill="#d8ead1" stroke="#72936a" stroke-width="2"/><circle cx="140" cy="275" r="16.667" fill="#f5f4ee" stroke="#62665e" stroke-width="2"/>
+  <line x1="430" y1="555" x2="485.556" y2="555" stroke="#24332e" stroke-width="4"/><line x1="430" y1="549" x2="430" y2="561" stroke="#24332e" stroke-width="2"/><line x1="485.556" y1="549" x2="485.556" y2="561" stroke="#24332e" stroke-width="2"/><text x="458" y="580" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#24332e">10 mm scale</text>
+  <path d="M 0 0 H 100 V 550 H 0 Z" fill="#dfe3e2"/><line x1="100" y1="45" x2="100" y2="530" stroke="#a14535" stroke-width="3" stroke-dasharray="8 6"/><text x="48" y="295" text-anchor="middle" transform="rotate(-90 48 295)" font-family="sans-serif" font-size="14" fill="#7c3025">Image capture edge</text>
+  <text x="350" y="510" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#59645d">Choose “needs review”; the missing edge is not measurable.</text>
+</svg>

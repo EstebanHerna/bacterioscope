@@ -8,7 +8,7 @@ IMPORTANT — scope of this validation
 --------------------------------------
 This script validates MEASUREMENT ACCURACY only (zone diameter in mm).
 It does NOT validate S/I/R classification because:
-  - The UZH reference uses EUCAST 2023 breakpoints (from SIRscan automated reader).
+  - Prior repository notes label the UZH reference EUCAST 2023; the dataset README says 2022.
   - BacterioScope classifies using CLSI M100-Ed33 2023 breakpoints.
   - EUCAST and CLSI breakpoints differ for many antibiotic-organism combinations.
   - Comparing S/I/R categories across standards produces misleading error rates
@@ -376,8 +376,9 @@ def _write_report(
     lines = [
         "# BacterioScope Validation Report",
         "",
-        "> Dataset: Egli et al. (2023) / University of Zurich SIRscan.",
+        "> Dataset: Giske et al. (2024) / University of Zurich SIRscan.",
         "> doi:10.5061/dryad.5dv41nsfj",
+        "> Edition note: prior validation notes say EUCAST 2023; the dataset README reports EUCAST 2022. The current metrics use zone diameters only; reconcile the edition before categorical analysis.",
         "",
         "## Scope and limitations",
         "",
@@ -385,7 +386,7 @@ def _write_report(
         "(mm vs SIRscan reference).",
         "S/I/R classification is **not** compared because:",
         "",
-        "- The UZH reference uses **EUCAST 2023** breakpoints (SIRscan automated reader).",
+        "- Prior repository notes label the UZH reference **EUCAST 2023**; the dataset README reports **EUCAST 2022**. Do not treat that edition as reconciled.",
         "- BacterioScope classifies using **CLSI M100-Ed33 2023** breakpoints.",
         "- EUCAST and CLSI thresholds differ for many antibiotic-organism combinations "
         "(e.g. ciprofloxacin S: EUCAST >= 25 mm vs CLSI >= 26 mm for Enterobacteriaceae).",
@@ -417,8 +418,8 @@ def _write_report(
         "",
         "| Item | Value |",
         "|---|---|",
-        "| Dataset | University of Zurich SIRscan (Egli et al., 2023) |",
-        "| Reference system | SIRscan automated reader (EUCAST 2023) |",
+        "| Dataset | University of Zurich SIRscan (Giske et al., 2024) |",
+        "| Reference system | SIRscan automated reader (EUCAST edition unresolved) |",
         f"| Total images evaluated | {n_images_total} |",
         f"| Images with matching disk count | {n_images_matched} |",
         f"| Disk-antibiotic pairs used for EA | {n_pairs} |",

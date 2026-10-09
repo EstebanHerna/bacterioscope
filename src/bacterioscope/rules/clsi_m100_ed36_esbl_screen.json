@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "catalog_version": "0.1.0",
+  "catalog_id": "bacterioscope-clsi-m100-ed36-esbl-screen",
+  "standard": "CLSI M100-Ed36 2026",
+  "status": "draft",
+  "reference": {
+    "source_id": "CLSI-M100-Ed36-2026",
+    "citation": "CLSI. Performance Standards for Antimicrobial Susceptibility Testing. 36th ed. CLSI supplement M100. Clinical and Laboratory Standards Institute; 2026.",
+    "url": "https://clsi.org/shop/standards/m100/",
+    "reuse_status": "authorized",
+    "reuse_evidence": "The project owner confirmed authorization on 2026-10-08; retain the authorization record and verify its scope for public distribution.",
+    "source_locator": "Table 3A, disk-diffusion screening criteria, printed p. 155; method conditions on printed pp. 154-155."
+  },
+  "criteria": [
+    {
+      "rule_id": "CLSI-M100-ED36-ESBL-KP-KO-EC-CEFPODOXIME-10",
+      "version": "0.1.0",
+      "status": "draft",
+      "organisms": ["Klebsiella pneumoniae", "Klebsiella oxytoca", "Escherichia coli"],
+      "antibiotic_code": "cefpodoxime",
+      "disk_potency_ug": 10,
+      "maximum_zone_mm": 17
+    },
+    {
+      "rule_id": "CLSI-M100-ED36-ESBL-KP-KO-EC-CEFTAZIDIME-30",
+      "version": "0.1.0",
+      "status": "draft",
+      "organisms": ["Klebsiella pneumoniae", "Klebsiella oxytoca", "Escherichia coli"],
+      "antibiotic_code": "ceftazidime",
+      "disk_potency_ug": 30,
+      "maximum_zone_mm": 22
+    },
+    {
+      "rule_id": "CLSI-M100-ED36-ESBL-KP-KO-EC-AZTREONAM-30",
+      "version": "0.1.0",
+      "status": "draft",
+      "organisms": ["Klebsiella pneumoniae", "Klebsiella oxytoca", "Escherichia coli"],
+      "antibiotic_code": "aztreonam",
+      "disk_potency_ug": 30,
+      "maximum_zone_mm": 27
+    },
+    {
+      "rule_id": "CLSI-M100-ED36-ESBL-KP-KO-EC-CEFOTAXIME-30",
+      "version": "0.1.0",
+      "status": "draft",
+      "organisms": ["Klebsiella pneumoniae", "Klebsiella oxytoca", "Escherichia coli"],
+      "antibiotic_code": "cefotaxime",
+      "disk_potency_ug": 30,
+      "maximum_zone_mm": 27
+    },
+    {
+      "rule_id": "CLSI-M100-ED36-ESBL-KP-KO-EC-CEFTRIAXONE-30",
+      "version": "0.1.0",
+      "status": "draft",
+      "organisms": ["Klebsiella pneumoniae", "Klebsiella oxytoca", "Escherichia coli"],
+      "antibiotic_code": "ceftriaxone",
+      "disk_potency_ug": 30,
+      "maximum_zone_mm": 25
+    },
+    {
+      "rule_id": "CLSI-M100-ED36-ESBL-PM-CEFPODOXIME-10",
+      "version": "0.1.0",
+      "status": "draft",
+      "organisms": ["Proteus mirabilis"],
+      "antibiotic_code": "cefpodoxime",
+      "disk_potency_ug": 10,
+      "maximum_zone_mm": 22
+    },
+    {
+      "rule_id": "CLSI-M100-ED36-ESBL-PM-CEFTAZIDIME-30",
+      "version": "0.1.0",
+      "status": "draft",
+      "organisms": ["Proteus mirabilis"],
+      "antibiotic_code": "ceftazidime",
+      "disk_potency_ug": 30,
+      "maximum_zone_mm": 22
+    },
+    {
+      "rule_id": "CLSI-M100-ED36-ESBL-PM-CEFOTAXIME-30",
+      "version": "0.1.0",
+      "status": "draft",
+      "organisms": ["Proteus mirabilis"],
+      "antibiotic_code": "cefotaxime",
+      "disk_potency_ug": 30,
+      "maximum_zone_mm": 27
+    }
+  ]
+}

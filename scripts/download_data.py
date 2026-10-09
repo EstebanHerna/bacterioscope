@@ -2,8 +2,8 @@
 
 Dryad/UZH dataset — manual download
 -------------------------------------
-The UZH SIRscan dataset (Egli et al., 2023) is published under CC0 1.0 and is freely
-available on Dryad. Dryad requires a manual browser step to generate the download link.
+The UZH SIRscan dataset (Giske et al., 2024) is published under CC0 1.0 on
+Dryad. Dryad requires a manual browser step to generate the download link.
 
 1. Open https://datadryad.org/dataset/doi:10.5061/dryad.5dv41nsfj in a browser.
 2. Click "Download dataset" and accept Dryad terms of service.
@@ -21,7 +21,8 @@ Roboflow and save the ZIP to data/raw/ (keep the original filename, e.g.
 Antibiotic.v6i.yolov8.zip).  This script extracts it to data/raw/roboflow_yolo/.
 
 Citation — Dryad/UZH:
-    Egli A, et al. (2023). Automated reading of disk diffusion antibiograms.
+    Giske CG, Bressan M, Fiechter F, Hinic V, Mancini S, Nolte O, Egli A (2024).
+    Image dataset of disk diffusion assay scanned with the SIRscan system.
     Dryad. https://doi.org/10.5061/dryad.5dv41nsfj
 """
 
@@ -38,7 +39,7 @@ _MAX_COMPRESSION_RATIO: float = 100.0  # zip bomb threshold
 _DATASETS: dict[str, dict[str, object]] = {
     "dryad_uzh": {
         "description": (
-            "University of Zurich SIRscan dataset (Egli et al., 2023). "
+            "University of Zurich SIRscan dataset (Giske et al., 2024). "
             "225 Gram-negative isolates, 862 phenotypic categories. CC0 1.0."
         ),
         "zip_globs": ["doi_10_5061_dryad*.zip", "dryad_uzh.zip", "dryad*.zip"],

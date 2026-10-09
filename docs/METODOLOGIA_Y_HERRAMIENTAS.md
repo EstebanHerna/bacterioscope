@@ -130,11 +130,11 @@ The validation script compares BacterioScope zone diameters against SIRscan refe
 
 ## 9. Reference dataset
 
-**Dryad/UZH SIRscan dataset** (Egli et al., 2023):
+**Dryad/UZH SIRscan dataset** (Giske et al., 2024):
 - 225 Gram-negative clinical isolates (Enterobacteriaceae and non-fermenters).
 - 862 phenotypic categories.
 - Zone diameters measured by SIRscan automated reader (calibrated optical system).
-- Breakpoints: EUCAST 2023 (note: BacterioScope uses CLSI 2023; only mm-level EA is compared in Phase 0–2).
+- Standard provenance: EUCAST; the dataset README reports 2022 while prior project notes report 2023. BacterioScope uses CLSI M100-Ed33 (2023); only mm-level EA is compared in Phase 0–2.
 - License: CC0 1.0 Universal.
 - DOI: [10.5061/dryad.5dv41nsfj](https://doi.org/10.5061/dryad.5dv41nsfj)
 

@@ -47,6 +47,18 @@ colab/*.zip
 
 .claude/
 
+# General skills are installed per developer environment, not vendored here.
+/.agents/skills/fastapi-python/
+/.agents/skills/fastapi-templates/
+/.agents/skills/machine-learning/
+/.agents/skills/pandas-data-analysis/
+/.agents/skills/pydantic/
+/.agents/skills/python-executor/
+/.agents/skills/python-testing-patterns/
+/.agents/skills/scikit-learn/
+/.agents/skills/senior-data-scientist/
+/skills-lock.json
+
 .vscode/
 .idea/
 
