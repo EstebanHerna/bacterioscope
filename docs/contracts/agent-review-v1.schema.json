@@ -1,49 +1,213 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "BacterioScope educational coaching response",
+  "title": "BacterioScope agent AST review report",
+  "description": "Persona 1 output contract: a clinical susceptibility measurement combined with sourced expert-rule findings, an optional ESBL screen, and optional public-health alerts. Every rule-derived section carries its own CLSI standard string, independent of the measurement standard, so a report can mix an approved measurement edition with a draft screen edition without conflating the two (see docs/TEAM_EXECUTION_PLAN.md, dual-edition decision).",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schema_version",
     "status",
-    "feedback_code",
-    "explanation",
-    "next_action",
-    "evidence_ids",
-    "requires_human_review"
+    "analysis_id",
+    "organism",
+    "measurement",
+    "rule_findings",
+    "cascade_suppressions",
+    "esbl_screen",
+    "public_alerts",
+    "catalog_status",
+    "model_explanation",
+    "requires_human_review",
+    "fallback_reason",
+    "traceability"
   ],
   "properties": {
     "schema_version": {"const": "1.0"},
-    "status": {"enum": ["coaching_ready", "review_required", "fallback"]},
-    "feedback_code": {
-      "enum": [
-        "within_exercise_tolerance",
-        "outside_exercise_tolerance",
-        "overlapping_zones",
-        "contour_may_be_truncated",
-        "irregular_contour",
-        "boundary_truncated",
-        "not_gradable",
-        "no_flag_detected"
-      ]
+    "status": {
+      "enum": ["grounded_report", "fallback"],
+      "description": "'fallback' means the model response failed schema, enum, citation, or forbidden-change validation, or timed out; the deterministic sections are still populated and safe to show."
     },
-    "explanation": {"type": "string", "minLength": 1, "maxLength": 700},
-    "next_action": {
-      "enum": [
-        "retry_measurement",
-        "remeasure_both_disks",
-        "inspect_contour",
-        "ask_instructor",
-        "try_next_exercise",
-        "none"
-      ]
+    "analysis_id": {"type": "string", "minLength": 1},
+    "organism": {"type": "string", "minLength": 1},
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["standard", "observations"],
+      "properties": {
+        "standard": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Breakpoint table version used for S/I/R, e.g. 'CLSI M100-Ed33 2023' (AnalysisResult.breakpoint_table_version)."
+        },
+        "observations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "disk_index", "antibiotic_code", "category", "zone_mm",
+              "quality_flags", "included_in_rule_evaluation", "exclusion_reason"
+            ],
+            "properties": {
+              "disk_index": {"type": "integer", "minimum": 0},
+              "antibiotic_code": {"type": "string", "minLength": 1},
+              "category": {"enum": ["S", "I", "R", "UNKNOWN"]},
+              "zone_mm": {"type": "number", "minimum": 0, "maximum": 100},
+              "quality_flags": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "low_circularity", "small_zone", "boundary",
+                    "crop_boundary", "overlap"
+                  ]
+                }
+              },
+              "included_in_rule_evaluation": {
+                "type": "boolean",
+                "description": "false when normalize_ast_observations() skipped this disk (UNKNOWN category or a duplicate antibiotic code) before calling the rule tools."
+              },
+              "exclusion_reason": {
+                "type": ["string", "null"],
+                "description": "Set exactly when included_in_rule_evaluation is false, e.g. 'unresolved_antibiotic_identity' or 'duplicate_antibiotic_code:<code>'."
+              }
+            }
+          }
+        }
+      }
     },
-    "evidence_ids": {
+    "rule_findings": {
       "type": "array",
-      "items": {"type": "string", "maxLength": 100},
-      "uniqueItems": true,
-      "maxItems": 8
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rule_type", "rule_id", "rule_version", "standard", "code",
+          "phenotype_label", "observed_codes", "source_id", "citation", "source_url"
+        ],
+        "properties": {
+          "rule_type": {"enum": ["intrinsic_resistance", "phenotype", "cascade"]},
+          "rule_id": {"type": "string", "minLength": 1},
+          "rule_version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+          "standard": {
+            "type": "string",
+            "minLength": 1,
+            "description": "This finding's own CLSI standard string. May differ from measurement.standard -- never merge them into one edition field."
+          },
+          "code": {"type": "string", "minLength": 1},
+          "phenotype_label": {"type": ["string", "null"]},
+          "observed_codes": {"type": "array", "items": {"type": "string"}},
+          "source_id": {"type": "string", "minLength": 1},
+          "citation": {"type": "string", "minLength": 1},
+          "source_url": {"type": "string", "pattern": "^https://"}
+        }
+      }
     },
-    "requires_human_review": {"type": "boolean"}
+    "cascade_suppressions": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "esbl_screen": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": [
+        "status", "screen_signal", "standard", "matches", "coverage_complete",
+        "catalog_status", "source_id", "citation", "source_url"
+      ],
+      "properties": {
+        "status": {"type": "string", "minLength": 1},
+        "screen_signal": {"type": ["boolean", "null"]},
+        "standard": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Independent of measurement.standard, e.g. ED36_STANDARD while the catalog is still draft."
+        },
+        "matches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rule_id", "antibiotic_code", "zone_mm", "maximum_zone_mm",
+              "source_id", "citation", "source_url"
+            ],
+            "properties": {
+              "rule_id": {"type": "string", "minLength": 1},
+              "antibiotic_code": {"type": "string", "minLength": 1},
+              "zone_mm": {"type": "number"},
+              "maximum_zone_mm": {"type": "number"},
+              "source_id": {"type": "string", "minLength": 1},
+              "citation": {"type": "string", "minLength": 1},
+              "source_url": {"type": "string", "pattern": "^https://"}
+            }
+          }
+        },
+        "coverage_complete": {"type": "boolean"},
+        "catalog_status": {"type": "string", "minLength": 1},
+        "source_id": {"type": ["string", "null"]},
+        "citation": {"type": ["string", "null"]},
+        "source_url": {"type": ["string", "null"]}
+      }
+    },
+    "public_alerts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "title", "url", "snippet", "published_date"],
+        "properties": {
+          "source": {"enum": ["ins", "ops"]},
+          "title": {"type": "string", "minLength": 1},
+          "url": {"type": "string", "pattern": "^https://"},
+          "snippet": {"type": "string"},
+          "published_date": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "catalog_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intrinsic_resistance", "phenotype", "cascade"],
+      "properties": {
+        "intrinsic_resistance": {"type": "string", "minLength": 1},
+        "phenotype": {"type": "string", "minLength": 1},
+        "cascade": {"type": "string", "minLength": 1}
+      },
+      "description": "One RuleEvaluation.catalog_status per tool call, e.g. 'no_rules_configured' while the builtin CLSI catalog is empty."
+    },
+    "model_explanation": {
+      "type": ["string", "null"],
+      "maxLength": 1500,
+      "description": "Nemotron's grounded narrative over the sections above. Null when status is 'fallback'."
+    },
+    "requires_human_review": {
+      "type": "boolean",
+      "description": "Always true in the current hackathon scope (AGENT_ARCHITECTURE.md: an accountable microbiologist stays in control); kept as a real field, not hardcoded, for when a narrower default is reviewed and approved."
+    },
+    "fallback_reason": {
+      "type": ["string", "null"],
+      "description": "Set exactly when status is 'fallback', e.g. 'model_timeout', 'schema_validation_failed', 'forbidden_change_detected', 'citation_not_in_evidence'."
+    },
+    "traceability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["software_version", "commit_hash", "image_sha256"],
+      "properties": {
+        "software_version": {"type": "string"},
+        "commit_hash": {"type": "string", "minLength": 1},
+        "image_sha256": {"type": "string"}
+      },
+      "description": "Carried straight from AnalysisResult, the project's existing traceability fields -- not reinvented for the agent report."
+    }
+  },
+  "if": {"properties": {"status": {"const": "fallback"}}},
+  "then": {
+    "properties": {
+      "model_explanation": {"const": null},
+      "fallback_reason": {"type": "string", "minLength": 1}
+    }
+  },
+  "else": {
+    "properties": {
+      "fallback_reason": {"const": null}
+    }
   }
 }

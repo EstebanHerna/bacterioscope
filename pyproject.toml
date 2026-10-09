@@ -49,6 +49,9 @@ api = [
 ui = [
     "streamlit>=1.28",
 ]
+agent = [
+    "openai>=1.40",
+]
 dev = [
     "pytest>=7.4",
     "pytest-cov>=4.1",
@@ -61,8 +64,9 @@ dev = [
     "types-PyYAML>=6.0",
     "python-docx>=1.1",
     "openpyxl>=3.1",
+    "jsonschema>=4.20",
 ]
-all = ["bacterioscope[ml,api,ui]"]
+all = ["bacterioscope[ml,api,ui,agent]"]
 
 [project.scripts]
 bacterioscope = "bacterioscope.cli:app"
