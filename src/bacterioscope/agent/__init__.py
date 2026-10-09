@@ -12,10 +12,31 @@ from bacterioscope.agent.contract import (
     build_measurement_section,
     normalize_ast_observations,
 )
+from bacterioscope.agent.nemotron_client import (
+    ChatCompletionResult,
+    TokenFactoryClient,
+    TokenFactoryConfigurationError,
+    TokenFactoryRequestError,
+)
+from bacterioscope.agent.routing import (
+    select_escalation_tier,
+    select_report_tier,
+    select_triage_tier,
+)
+from bacterioscope.agent.validator import ValidationResult, validate_and_render
 
 __all__ = [
+    "ChatCompletionResult",
     "MeasurementObservation",
     "NormalizedObservations",
+    "TokenFactoryClient",
+    "TokenFactoryConfigurationError",
+    "TokenFactoryRequestError",
+    "ValidationResult",
     "build_measurement_section",
     "normalize_ast_observations",
+    "select_escalation_tier",
+    "select_report_tier",
+    "select_triage_tier",
+    "validate_and_render",
 ]
