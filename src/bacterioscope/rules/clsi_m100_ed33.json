@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "catalog_version": "0.0.0",
+  "catalog_id": "bacterioscope-clsi-m100-ed33-expert-rules",
+  "standard": "CLSI M100-Ed33 2023",
+  "status": "blocked_pending_authorized_content_and_qualified_review",
+  "rules": []
+}

@@ -87,7 +87,7 @@ El sistema está implementado en Python 3.10+ y opera en un pipeline modular:
 
 La validación cuantitativa sigue el protocolo ISO 20776-2 / criterios FDA para sistemas AST:
 
-**Dataset de referencia:** Dryad/UZH (Egli et al., 2023) — 225 aislados clínicos Gram-negativos fotografiados con configuración estandarizada y medidos por SIRscan (lector automatizado calibrado). Dataset de acceso abierto (CC0 1.0).
+**Dataset:** Dryad/UZH (Giske et al., 2024) — 225 aislados Gram-negativos y 862 categorías fenotípicas. Las tablas DOCX por aislado permiten comparar diámetros SIRscan. El registro Dryad dice que `Tables.zip` contiene `measurements.csv`, pero el paquete descargado no lo tiene e incluye `Overview GPT JCM.xlsx`; el rol de sus indicadores no está confirmado y sus conteos difieren de los fenotipos de referencia del artículo. No presentar ese libro como ground truth hasta aclararlo. Dataset CC0 1.0, de procedencia EUCAST/SIRscan; el README dice EUCAST 2022 y el artículo cita tablas versión 13.1 (2023). No es verdad de referencia CLSI.
 
 **Métricas objetivo para Fase 3:**
 
@@ -108,7 +108,7 @@ El análisis de concordancia incluye gráficos de Bland-Altman (diferencia media
 | Fase | Alcance | Estado |
 |---|---|---|
 | **F0** | Pipeline completo con línea base Hough + clasificador CLSI + demo + CI | **Completa** |
-| **F1** | Curación y anotación del dataset Dryad/UZH (225 aislados, ground truth clínico) | Planificada |
+| **F1** | Curar mediciones Dryad/UZH y resolver la procedencia de las etiquetas; no usar `Overview GPT JCM.xlsx` como ground truth hasta confirmación | Planificada |
 | **F2** | Entrenamiento de YOLOv8 para detección de discos y lectura de etiqueta impresa | Planificada |
 | **F3** | Recalibración px/mm usando disco físico (6 mm); validación clínica completa | Planificada |
 | **F4** | Paquete PyPI, imagen Docker, despliegue público, documentación MkDocs | Planificada |

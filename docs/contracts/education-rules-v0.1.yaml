@@ -1,0 +1,182 @@
+schema_version: "0.1"
+registry_id: bacterioscope-education-feedback
+mode: education
+status: draft
+default_policy: "Never load or expose a draft rule in the user-facing product."
+rules:
+  - rule_id: EDU-GRADE-WITHIN-TOL-001
+    version: 0.1.0
+    mode: education
+    scope: "A submitted numeric diameter for an enabled, reviewed SVG measurement exercise whose absolute error is within that exercise's configured tolerance."
+    trigger: {source: deterministic_grading_band, equals: within_tolerance}
+    feedback_code: within_exercise_tolerance
+    allowed_actions: [try_next_exercise, none]
+    teaching_points:
+      - "The submitted answer is inside the configured tolerance for this exercise."
+      - "This statement applies only to the exercise drawing and its rubric."
+    prohibited_claims:
+      - "Do not call the measurement clinically correct, validated, safe, susceptible, or resistant."
+      - "Do not infer a breakpoint, organism, phenotype, or treatment."
+    evidence_source_ids: [EDU-SVG-GEOMETRY-001, EDU-GRADE-RUBRIC-001]
+    author: Luis (Persona 2; AI-assisted draft)
+    reviewer: null
+    reviewed_at: null
+    status: draft
+
+  - rule_id: EDU-GRADE-OUTSIDE-TOL-001
+    version: 0.1.0
+    mode: education
+    scope: "A submitted numeric diameter for an enabled, reviewed SVG measurement exercise whose absolute error exceeds that exercise's configured tolerance."
+    trigger: {source: deterministic_grading_band, equals: outside_tolerance}
+    feedback_code: outside_exercise_tolerance
+    allowed_actions: [retry_measurement, ask_instructor]
+    teaching_points:
+      - "The submitted answer is outside the configured tolerance for this exercise."
+      - "Invite the learner to compare the visible outer edge and scale bar before retrying."
+    prohibited_claims:
+      - "Do not infer the cause of the learner's error without observing their method."
+      - "Do not call the result clinically wrong, resistant, or susceptible."
+      - "Do not change the learner's answer or the exercise reference."
+    evidence_source_ids: [EDU-SVG-GEOMETRY-001, EDU-GRADE-RUBRIC-001]
+    author: Luis (Persona 2; AI-assisted draft)
+    reviewer: null
+    reviewed_at: null
+    status: draft
+
+  - rule_id: EDU-QC-OVERLAP-001
+    version: 0.1.0
+    mode: education
+    scope: "Explain an existing pipeline overlap flag during an explicitly experimental review; both affected measurements require review."
+    trigger: {source: pipeline_flag, equals: overlap}
+    feedback_code: overlapping_zones
+    allowed_actions: [ask_instructor]
+    teaching_points:
+      - "The image-analysis pipeline reports that the estimated zones overlap."
+      - "Treat both measurements as needing review in this exercise."
+    prohibited_claims:
+      - "Do not infer an organism phenotype, resistance mechanism, or S/I/R category."
+      - "Do not claim that the true separate boundaries can be recovered from this image."
+      - "Do not call the pipeline estimate a student answer key."
+    evidence_source_ids: [EDU-RULE-PIPELINE-001]
+    author: Luis (Persona 2; AI-assisted draft)
+    reviewer: null
+    reviewed_at: null
+    status: draft
+
+  - rule_id: EDU-QC-CROP-BOUNDARY-001
+    version: 0.1.0
+    mode: education
+    scope: "Explain the implemented crop_boundary flag for a pipeline-estimated zone; do not conflate it with a photographed image edge."
+    trigger: {source: pipeline_flag, equals: crop_boundary}
+    feedback_code: contour_may_be_truncated
+    allowed_actions: [ask_instructor]
+    teaching_points:
+      - "The estimated mask reaches the pipeline's per-disk search-crop limit."
+      - "The displayed diameter needs review and must not be treated as a verified value."
+    prohibited_claims:
+      - "Do not claim a new photo will necessarily resolve the ambiguity."
+      - "Do not invent or substitute a corrected diameter."
+      - "Do not say this flag means the image frame itself is cropped."
+    evidence_source_ids: [EDU-RULE-PIPELINE-001]
+    author: Luis (Persona 2; AI-assisted draft)
+    reviewer: null
+    reviewed_at: null
+    status: draft
+
+  - rule_id: EDU-QC-LOW-CIRCULARITY-001
+    version: 0.1.0
+    mode: education
+    scope: "Explain the existing low_circularity flag as a contour-shape review cue, not a biological conclusion."
+    trigger: {source: pipeline_flag, equals: low_circularity}
+    feedback_code: irregular_contour
+    allowed_actions: [inspect_contour, ask_instructor]
+    teaching_points:
+      - "The detected contour is less circular than the pipeline's configured threshold."
+      - "Inspect the boundary and treat the estimate as needing review."
+    prohibited_claims:
+      - "Do not infer bacterial morphology, a resistance mechanism, or clinical significance."
+      - "Do not change the numeric diameter based on contour shape alone."
+    evidence_source_ids: [EDU-RULE-PIPELINE-001]
+    author: Luis (Persona 2; AI-assisted draft)
+    reviewer: null
+    reviewed_at: null
+    status: draft
+
+  - rule_id: EDU-QC-IMAGE-BOUNDARY-001
+    version: 0.1.0
+    mode: education
+    scope: "Explain the existing boundary flag when a pipeline-estimated circle extends past the captured image edge beyond the implemented tolerance."
+    trigger: {source: pipeline_flag, equals: boundary}
+    feedback_code: boundary_truncated
+    allowed_actions: [inspect_contour, ask_instructor]
+    teaching_points:
+      - "Part of the estimated zone circle extends beyond the image frame."
+      - "The unavailable edge cannot be measured from the visible pixels; use the review path."
+    prohibited_claims:
+      - "Do not invent the missing edge or extrapolate a corrected diameter."
+      - "Do not treat the boundary flag as evidence about the organism."
+    evidence_source_ids: [EDU-RULE-PIPELINE-001]
+    author: Luis (Persona 2; AI-assisted draft)
+    reviewer: null
+    reviewed_at: null
+    status: draft
+
+  - rule_id: EDU-QC-SMALL-ZONE-001
+    version: 0.1.0
+    mode: education
+    scope: "Explain the existing small_zone flag as a measurement review cue only."
+    trigger: {source: pipeline_flag, equals: small_zone}
+    feedback_code: not_gradable
+    allowed_actions: [inspect_contour, ask_instructor]
+    teaching_points:
+      - "The estimated diameter is smaller than the configured physical-disk comparison threshold."
+      - "Review the image and measurement; the flag alone does not establish why the estimate is small."
+    prohibited_claims:
+      - "Do not call the organism resistant or infer a resistance mechanism."
+      - "Do not classify the case as a clinical result."
+    evidence_source_ids: [EDU-RULE-PIPELINE-001]
+    author: Luis (Persona 2; AI-assisted draft)
+    reviewer: null
+    reviewed_at: null
+    status: draft
+
+  - rule_id: EDU-QC-NO-FLAG-001
+    version: 0.1.0
+    mode: education
+    scope: "Describe an empty list of currently implemented pipeline quality flags without claiming measurement correctness."
+    trigger: {source: pipeline_flags, equals: empty}
+    feedback_code: no_flag_detected
+    allowed_actions: [none, ask_instructor]
+    teaching_points:
+      - "No currently implemented quality flag fired for this estimate."
+      - "Use the separate exercise grader or human review to assess the task."
+    prohibited_claims:
+      - "Do not say no flags means correct, verified, safe, or clinically validated."
+      - "Do not use this rule to override an outside-tolerance deterministic grade."
+    evidence_source_ids: [EDU-RULE-PIPELINE-001]
+    author: Luis (Persona 2; AI-assisted draft)
+    reviewer: null
+    reviewed_at: null
+    status: draft
+
+  - rule_id: EDU-CASE-UNGRADABLE-001
+    version: 0.1.0
+    mode: education
+    scope: "An exercise record explicitly marks a visual case ungradable because a distinct edge cannot be assigned."
+    trigger: {source: exercise_gradability, equals: ungradable}
+    feedback_code: not_gradable
+    allowed_actions: [ask_instructor]
+    teaching_points:
+      - "This exercise does not have a defensible numeric reference for the visible case."
+      - "Do not guess a missing or shared zone edge."
+    prohibited_claims:
+      - "Do not generate a reference diameter or grade the learner numerically."
+      - "Do not infer susceptibility, resistance, or treatment."
+    evidence_source_ids: [EDU-SVG-GEOMETRY-001]
+    author: Luis (Persona 2; AI-assisted draft)
+    reviewer: null
+    reviewed_at: null
+    status: draft
+
+# All content is disabled until the qualified reviewer and product integration owner
+# approve the wording, the exercise set, and the corresponding output-schema enums.

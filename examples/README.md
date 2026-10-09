@@ -18,6 +18,14 @@ ESBL-like). Regenerate with `python scripts/generate_test_plates.py`.
   circles and categories already drawn on, for visual comparison only. **Do not
   upload these into the app.**
 
+## education/
+
+Seven project-authored SVG geometry exercises for the planned Bench Coach flow.
+See `education/manifest.yaml` for answer references, scale, tolerance, image
+hashes, and review status. All cases are **draft and disabled** pending review
+by a qualified microbiology instructor; they are measurement diagrams, not
+biological AST data or clinical examples.
+
 ## real/
 
 Real clinical Kirby-Bauer plate photographs used for manual testing (not part of the

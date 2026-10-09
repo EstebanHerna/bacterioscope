@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "catalog_version": "0.1.0",
+  "catalog_id": "bacterioscope-clsi-m100-ed36-expert-rules",
+  "standard": "CLSI M100-Ed36 2026",
+  "status": "draft_pending_qualified_review_and_pipeline_edition",
+  "source_id": "CLSI-M100-Ed36-2026",
+  "reuse_status": "authorized",
+  "reuse_evidence": "The user confirmed project authorization on 2026-10-08. The grant record is not stored in this repository; verify its scope before public release.",
+  "rules": [
+    {
+      "rule_id": "CLSI-M100-ED36-APPB-KLEBSIELLA-AMPICILLIN",
+      "rule_type": "intrinsic_resistance",
+      "version": "0.1.0",
+      "status": "draft",
+      "organisms": [
+        "Klebsiella pneumoniae",
+        "Klebsiella oxytoca",
+        "Klebsiella variicola"
+      ],
+      "conditions": [
+        {"antibiotic_code": "ampicillin", "categories": ["S", "I"]}
+      ],
+      "finding_code": "intrinsic_resistance_discordance",
+      "reference": {
+        "source_id": "CLSI-M100-Ed36-2026",
+        "citation": "CLSI. Performance Standards for Antimicrobial Susceptibility Testing. 36th ed. CLSI supplement M100. Clinical and Laboratory Standards Institute; 2026.",
+        "url": "https://clsi.org/shop/standards/m100/",
+        "standard": "CLSI M100-Ed36 2026",
+        "reuse_status": "authorized",
+        "reuse_evidence": "The user confirmed project authorization on 2026-10-08. The grant record is not stored in this repository; verify its scope before public release.",
+        "source_locator": "Appendix B, B1 Enterobacterales, p. 318; grouped Klebsiella species row, ampicillin column."
+      }
+    },
+    {
+      "rule_id": "CLSI-M100-ED36-APPB-CITROBACTER-FREUNDII-AMPICILLIN",
+      "rule_type": "intrinsic_resistance",
+      "version": "0.1.0",
+      "status": "draft",
+      "organisms": ["Citrobacter freundii"],
+      "conditions": [
+        {"antibiotic_code": "ampicillin", "categories": ["S", "I"]}
+      ],
+      "finding_code": "intrinsic_resistance_discordance",
+      "reference": {
+        "source_id": "CLSI-M100-Ed36-2026",
+        "citation": "CLSI. Performance Standards for Antimicrobial Susceptibility Testing. 36th ed. CLSI supplement M100. Clinical and Laboratory Standards Institute; 2026.",
+        "url": "https://clsi.org/shop/standards/m100/",
+        "standard": "CLSI M100-Ed36 2026",
+        "reuse_status": "authorized",
+        "reuse_evidence": "The user confirmed project authorization on 2026-10-08. The grant record is not stored in this repository; verify its scope before public release.",
+        "source_locator": "Appendix B, B1 Enterobacterales, p. 318; Citrobacter freundii row, ampicillin column."
+      }
+    },
+    {
+      "rule_id": "CLSI-M100-ED36-APPB-CITROBACTER-FREUNDII-AMOXICILLIN-CLAVULANATE",
+      "rule_type": "intrinsic_resistance",
+      "version": "0.1.0",
+      "status": "draft",
+      "organisms": ["Citrobacter freundii"],
+      "conditions": [
+        {"antibiotic_code": "amoxicillin-clavulanate", "categories": ["S", "I"]}
+      ],
+      "finding_code": "intrinsic_resistance_discordance",
+      "reference": {
+        "source_id": "CLSI-M100-Ed36-2026",
+        "citation": "CLSI. Performance Standards for Antimicrobial Susceptibility Testing. 36th ed. CLSI supplement M100. Clinical and Laboratory Standards Institute; 2026.",
+        "url": "https://clsi.org/shop/standards/m100/",
+        "standard": "CLSI M100-Ed36 2026",
+        "reuse_status": "authorized",
+        "reuse_evidence": "The user confirmed project authorization on 2026-10-08. The grant record is not stored in this repository; verify its scope before public release.",
+        "source_locator": "Appendix B, B1 Enterobacterales, p. 318; Citrobacter freundii row, amoxicillin-clavulanate column."
+      }
+    },
+    {
+      "rule_id": "CLSI-M100-ED36-APPB-ENTEROBACTER-CLOACAE-COMPLEX-AMPICILLIN",
+      "rule_type": "intrinsic_resistance",
+      "version": "0.1.0",
+      "status": "draft",
+      "organisms": ["Enterobacter cloacae complex"],
+      "conditions": [
+        {"antibiotic_code": "ampicillin", "categories": ["S", "I"]}
+      ],
+      "finding_code": "intrinsic_resistance_discordance",
+      "reference": {
+        "source_id": "CLSI-M100-Ed36-2026",
+        "citation": "CLSI. Performance Standards for Antimicrobial Susceptibility Testing. 36th ed. CLSI supplement M100. Clinical and Laboratory Standards Institute; 2026.",
+        "url": "https://clsi.org/shop/standards/m100/",
+        "standard": "CLSI M100-Ed36 2026",
+        "reuse_status": "authorized",
+        "reuse_evidence": "The user confirmed project authorization on 2026-10-08. The grant record is not stored in this repository; verify its scope before public release.",
+        "source_locator": "Appendix B, B1 Enterobacterales, p. 318; Enterobacter cloacae complex row, ampicillin column."
+      }
+    },
+    {
+      "rule_id": "CLSI-M100-ED36-APPB-ENTEROBACTER-CLOACAE-COMPLEX-AMOXICILLIN-CLAVULANATE",
+      "rule_type": "intrinsic_resistance",
+      "version": "0.1.0",
+      "status": "draft",
+      "organisms": ["Enterobacter cloacae complex"],
+      "conditions": [
+        {"antibiotic_code": "amoxicillin-clavulanate", "categories": ["S", "I"]}
+      ],
+      "finding_code": "intrinsic_resistance_discordance",
+      "reference": {
+        "source_id": "CLSI-M100-Ed36-2026",
+        "citation": "CLSI. Performance Standards for Antimicrobial Susceptibility Testing. 36th ed. CLSI supplement M100. Clinical and Laboratory Standards Institute; 2026.",
+        "url": "https://clsi.org/shop/standards/m100/",
+        "standard": "CLSI M100-Ed36 2026",
+        "reuse_status": "authorized",
+        "reuse_evidence": "The user confirmed project authorization on 2026-10-08. The grant record is not stored in this repository; verify its scope before public release.",
+        "source_locator": "Appendix B, B1 Enterobacterales, p. 318; Enterobacter cloacae complex row, amoxicillin-clavulanate column."
+      }
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-labelledby="title desc">
+  <title id="title">Exercise 05: compare two zones</title><desc id="desc">Two non-overlapping synthetic zones around 6 mm disks. Zone A is 18 mm and Zone B is 28 mm. Geometry only.</desc>
+  <rect width="600" height="600" fill="#f6f7f3"/><text x="300" y="28" text-anchor="middle" font-family="sans-serif" font-size="17" fill="#24332e">Practice — measure Zone B using the scale</text>
+  <circle cx="300" cy="275" r="250" fill="#e8e4d4" stroke="#74796e" stroke-width="3"/><circle cx="220" cy="275" r="25" fill="#d8ead1" stroke="#72936a" stroke-width="2"/><circle cx="220" cy="275" r="16.667" fill="#f5f4ee" stroke="#62665e" stroke-width="2"/><text x="220" y="365" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#24332e">Zone A</text>
+  <circle cx="390" cy="275" r="38.889" fill="#d8ead1" stroke="#72936a" stroke-width="2"/><circle cx="390" cy="275" r="16.667" fill="#f5f4ee" stroke="#62665e" stroke-width="2"/><text x="390" y="365" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#24332e">Zone B</text>
+  <line x1="220" y1="555" x2="275.556" y2="555" stroke="#24332e" stroke-width="4"/><line x1="220" y1="549" x2="220" y2="561" stroke="#24332e" stroke-width="2"/><line x1="275.556" y1="549" x2="275.556" y2="561" stroke="#24332e" stroke-width="2"/><text x="248" y="580" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#24332e">10 mm scale</text>
+  <text x="390" y="510" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#59645d">No susceptibility category is represented.</text>
+</svg>

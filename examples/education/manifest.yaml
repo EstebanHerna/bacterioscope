@@ -1,0 +1,124 @@
+schema_version: "0.1"
+manifest_id: bacterioscope-geometry-exercises
+manifest_version: 0.1.0
+created_at: 2026-10-08
+author: "Luis (Persona 2; AI-assisted draft)"
+mode: education
+status: draft
+source_id: EDU-SVG-GEOMETRY-001
+source_file: docs/EDUCATION_SOURCE_INVENTORY.md
+license_basis: "Project-authored for this repository; intended under repository MIT license, subject to team owner confirmation."
+reviewer: null
+review_status: blocked_pending_qualified_microbiology_instructor
+rubric:
+  rubric_id: EDU-MEASURE-SVG-001
+  version: 0.1.0
+  answer_unit: mm
+  tolerance_absolute_mm: 1.0
+  tolerance_status: provisional_unvalidated
+  rationale: "Initial allowance for visual measurement and rounding against the embedded scale in a clean vector drawing; must be piloted with the intended learners. This is not a clinical acceptance criterion or CLSI Essential Agreement."
+  grade_bands:
+    within_tolerance: "absolute_error_mm <= tolerance_absolute_mm"
+    outside_tolerance: "absolute_error_mm > tolerance_absolute_mm"
+  prohibited_interpretations:
+    - "Do not call an answer clinically correct or validated."
+    - "Do not infer susceptibility, resistance, organism identity, or treatment."
+    - "Do not use these vector cases to report CV accuracy."
+cases:
+  - exercise_id: EDU-SVG-001
+    asset: examples/education/exercise-01.svg
+    sha256: 501c526abc80de4b3db8290bb70f1e73e9933b59e582a91c5315fc1d3c3d0a66
+    task: "Measure the diameter of the single visible outer zone using the 10 mm scale."
+    reference_answer: {value: 18.0, unit: mm, construction: "2 * radius 50.0 SVG units / 5.5555556 units per mm"}
+    tolerance_absolute_mm: 1.0
+    feedback_codes: [within_exercise_tolerance, outside_exercise_tolerance]
+    answer_visibility: after_submission_only
+    reviewer: null
+    reviewed_at: null
+    status: draft
+    enabled_for_grading: false
+    caveat: "Simple vector geometry; does not represent agar, a biological zone, or a clinical test result."
+
+  - exercise_id: EDU-SVG-002
+    asset: examples/education/exercise-02.svg
+    sha256: 439063e371cbd2b701a7cdd61d4105e98699d25d12aa023d2d4b700cc93a7f1b
+    task: "Measure the diameter of the single visible outer zone using the 10 mm scale."
+    reference_answer: {value: 22.0, unit: mm, construction: "2 * radius 61.111 SVG units / 5.5555556 units per mm"}
+    tolerance_absolute_mm: 1.0
+    feedback_codes: [within_exercise_tolerance, outside_exercise_tolerance]
+    answer_visibility: after_submission_only
+    reviewer: null
+    reviewed_at: null
+    status: draft
+    enabled_for_grading: false
+    caveat: "Simple vector geometry; does not represent agar, a biological zone, or a clinical test result."
+
+  - exercise_id: EDU-SVG-003
+    asset: examples/education/exercise-03.svg
+    sha256: 276df8d151f0c38357f0b2e6104b4a243b958861235de7e77608fba98d3f1fb1
+    task: "Measure the diameter of the single visible outer zone using the 10 mm scale."
+    reference_answer: {value: 26.0, unit: mm, construction: "2 * radius 72.222 SVG units / 5.5555556 units per mm"}
+    tolerance_absolute_mm: 1.0
+    feedback_codes: [within_exercise_tolerance, outside_exercise_tolerance]
+    answer_visibility: after_submission_only
+    reviewer: null
+    reviewed_at: null
+    status: draft
+    enabled_for_grading: false
+    caveat: "Simple vector geometry; does not represent agar, a biological zone, or a clinical test result."
+
+  - exercise_id: EDU-SVG-004
+    asset: examples/education/exercise-04.svg
+    sha256: 7b381253ebac3ae9ff6ec2d0d8b212eee40b9e5825452bae3f9c5f45eb075580
+    task: "Measure the diameter of the single visible outer zone using the 10 mm scale."
+    reference_answer: {value: 30.0, unit: mm, construction: "2 * radius 83.333 SVG units / 5.5555556 units per mm"}
+    tolerance_absolute_mm: 1.0
+    feedback_codes: [within_exercise_tolerance, outside_exercise_tolerance]
+    answer_visibility: after_submission_only
+    reviewer: null
+    reviewed_at: null
+    status: draft
+    enabled_for_grading: false
+    caveat: "Simple vector geometry; does not represent agar, a biological zone, or a clinical test result."
+
+  - exercise_id: EDU-SVG-005
+    asset: examples/education/exercise-05.svg
+    sha256: 593c525e4710c4b9a622a8abae8ccfac4a0eca1fed258b8afa68ad8b07fc6626
+    task: "Measure Zone B, not Zone A, using the 10 mm scale."
+    reference_answer: {value: 28.0, unit: mm, construction: "2 * radius 77.778 SVG units / 5.5555556 units per mm"}
+    tolerance_absolute_mm: 1.0
+    feedback_codes: [within_exercise_tolerance, outside_exercise_tolerance]
+    answer_visibility: after_submission_only
+    reviewer: null
+    reviewed_at: null
+    status: draft
+    enabled_for_grading: false
+    caveat: "Two clean, non-overlapping vector shapes; tests target selection and scale reading, not organism/disk identification."
+
+  - exercise_id: EDU-SVG-006
+    asset: examples/education/exercise-06.svg
+    sha256: c8f0531f55e9f9faf7b6e8a56ba949c9beed1be638245d04db6bae434ea99e77
+    task: "Decide whether two separate zone diameters can be graded from this merged illustration."
+    reference_answer: {value: null, unit: mm, construction: "No unique separate-zone reference; intentionally ungradable."}
+    tolerance_absolute_mm: null
+    feedback_codes: [overlapping_zones, not_gradable]
+    answer_visibility: after_submission_only
+    reviewer: null
+    reviewed_at: null
+    status: draft
+    enabled_for_grading: false
+    caveat: "Illustrates an ambiguous merged shape; not an actual pipeline image and not evidence about CV overlap detection."
+
+  - exercise_id: EDU-SVG-007
+    asset: examples/education/exercise-07.svg
+    sha256: 438972c42ce6f14c043372e3fe65379e6ee92506a176199f590f2565dec6f48d
+    task: "Decide whether the zone diameter can be graded when the illustration is cut by the capture edge."
+    reference_answer: {value: null, unit: mm, construction: "Visible zone is truncated; do not invent the missing edge."}
+    tolerance_absolute_mm: null
+    feedback_codes: [boundary_truncated, not_gradable]
+    answer_visibility: after_submission_only
+    reviewer: null
+    reviewed_at: null
+    status: draft
+    enabled_for_grading: false
+    caveat: "Illustrates a truncated capture, not the pipeline's internal crop_boundary signal."

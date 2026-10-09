@@ -4,7 +4,7 @@ Uses synthetic diameter data to verify matching logic without requiring the
 Dryad/UZH dataset to be present on the machine running tests.
 
 Why only measurement accuracy is tested here:
-    The Dryad/UZH reference uses EUCAST 2023 breakpoints; BacterioScope
+    The UZH dataset README says EUCAST 2022; older repository notes say 2023. BacterioScope
     classifies with CLSI M100-Ed33 2023.  These standards differ for many
     antibiotic-organism combinations, so comparing S/I/R across them would
     produce misleading discordance rates.  Phase 0 therefore validates only

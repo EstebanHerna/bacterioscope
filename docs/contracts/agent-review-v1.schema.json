@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BacterioScope educational coaching response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "feedback_code",
+    "explanation",
+    "next_action",
+    "evidence_ids",
+    "requires_human_review"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "status": {"enum": ["coaching_ready", "review_required", "fallback"]},
+    "feedback_code": {
+      "enum": [
+        "within_exercise_tolerance",
+        "outside_exercise_tolerance",
+        "overlapping_zones",
+        "contour_may_be_truncated",
+        "irregular_contour",
+        "boundary_truncated",
+        "not_gradable",
+        "no_flag_detected"
+      ]
+    },
+    "explanation": {"type": "string", "minLength": 1, "maxLength": 700},
+    "next_action": {
+      "enum": [
+        "retry_measurement",
+        "remeasure_both_disks",
+        "inspect_contour",
+        "ask_instructor",
+        "try_next_exercise",
+        "none"
+      ]
+    },
+    "evidence_ids": {
+      "type": "array",
+      "items": {"type": "string", "maxLength": 100},
+      "uniqueItems": true,
+      "maxItems": 8
+    },
+    "requires_human_review": {"type": "boolean"}
+  }
+}
