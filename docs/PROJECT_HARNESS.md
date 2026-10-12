@@ -65,7 +65,7 @@ See `UZH_LABEL_AUDIT.md` for extracted workbook counts, provenance, limits, and 
 - Invoke the ESBL evaluator only when the caller supplies an explicit ESBL edition and typed assay/disk inputs; the draft Ed36 catalog still returns unavailable.
 - Exclude any disk with a pipeline quality flag from the expert-rule observations, and preserve the exclusion reason in the report.
 - Let the report caller opt into fixed INS/OPS Tavily queries; report `available`, `no_results`, `partial`, or `unavailable` without stopping plate review.
-- Focused integration suite passed: **94 passed**; Ruff, compilation, schema parsing, and whitespace checks passed. CI and CodeQL passed on commit `33c2d3b`; rerun them if code changes.
+- Focused integration suite passed: **94 passed**; Ruff, compilation, schema parsing, and whitespace checks passed. CI and CodeQL passed on merged commit `c8d5475`.
 
 ### Blockers / follow-up
 
@@ -78,7 +78,7 @@ See `UZH_LABEL_AUDIT.md` for extracted workbook counts, provenance, limits, and 
 
 ## Next concrete action
 
-After PR #5 merges, P4 must call the report path with the selected rule edition, any optional ESBL inputs, and server-side Tavily search, then display the resulting states. Keep clinical catalogs unavailable until the correct-edition source and traceable qualified review are recorded. Daniel should continue excluding workbook phenotype indicators from reference metrics until Dryad/the authors clarify their meaning.
+P4 must call the report path with the selected rule edition, any optional ESBL inputs, and server-side Tavily search, then display the resulting states. Keep clinical catalogs unavailable until the correct-edition source and traceable qualified review are recorded. Daniel should continue excluding workbook phenotype indicators from reference metrics until Dryad/the authors clarify their meaning.
 
 ## Change log
 
