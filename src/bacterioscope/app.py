@@ -59,6 +59,7 @@ _COMPONENT_CSS = (
     "font-variant-numeric:tabular-nums;line-height:1}"
     ".bs-metric--s .m-n{color:var(--bs-cat-susceptible)}"
     ".bs-metric--i .m-n{color:var(--bs-cat-intermediate)}"
+    ".bs-metric--sdd .m-n{color:var(--bs-cat-intermediate)}"
     ".bs-metric--r .m-n{color:var(--bs-cat-resistant)}"
     ".m-lbl{font-size:.60rem;font-weight:600;text-transform:uppercase;"
     "letter-spacing:.08em;color:var(--bs-text-secondary);margin-top:5px}"
@@ -78,6 +79,8 @@ _COMPONENT_CSS = (
     ".bs-badge--s{color:var(--bs-cat-susceptible);"
     "background:color-mix(in srgb,var(--bs-cat-susceptible) 12%,transparent)}"
     ".bs-badge--i{color:var(--bs-cat-intermediate);"
+    "background:color-mix(in srgb,var(--bs-cat-intermediate) 12%,transparent)}"
+    ".bs-badge--sdd{color:var(--bs-cat-intermediate);"
     "background:color-mix(in srgb,var(--bs-cat-intermediate) 12%,transparent)}"
     ".bs-badge--r{color:var(--bs-cat-resistant);"
     "background:color-mix(in srgb,var(--bs-cat-resistant) 12%,transparent)}"
@@ -137,7 +140,7 @@ def _build_css() -> str:
 # Stroke-colour presets — None means use category colour
 # ---------------------------------------------------------------------------
 _STROKE_OPTIONS: dict[str, tuple[int, int, int] | None] = {
-    "Category (S/I/R)": None,
+    "Category (S/SDD/I/R)": None,
     "White": (240, 240, 240),
     "Cyan": (220, 210, 0),
     "Amber": (30, 130, 200),
@@ -284,7 +287,7 @@ def _mode_indicator(is_hough: bool) -> None:
         title = "Geometric detection (Hough circles)"
         desc = (
             "No YOLOv8 weights found. Zone diameters are measured. "
-            "Assign antibiotics below to compute S/I/R."
+            "Assign antibiotics below to compute CLSI categories (S/SDD/I/R)."
         )
     else:
         css = "bs-mode bs-mode--ok"
@@ -298,7 +301,7 @@ def _mode_indicator(is_hough: bool) -> None:
 
 
 def _category_badge(category: str) -> str:
-    css = category.lower() if category in ("S", "I", "R") else "unknown"
+    css = category.lower() if category in ("S", "SDD", "I", "R") else "unknown"
     return f'<span class="bs-badge bs-badge--{css}">{category}</span>'
 
 
@@ -316,14 +319,20 @@ def _flag_badges(disk_flags: list[str]) -> str:
 
 
 def _metric_cards(classifications: list[SusceptibilityResult]) -> None:
-    counts = {k: sum(1 for c in classifications if c.category == k) for k in ("S", "I", "R")}
-    labels = {"S": "Susceptible", "I": "Intermediate", "R": "Resistant"}
+    categories = ("S", "SDD", "I", "R")
+    counts = {k: sum(1 for c in classifications if c.category == k) for k in categories}
+    labels = {
+        "S": "Susceptible",
+        "SDD": "Susceptible dose-dependent",
+        "I": "Intermediate",
+        "R": "Resistant",
+    }
     cards = "".join(
         f'<div class="bs-metric bs-metric--{cat.lower()}">'
         f'<div class="m-n">{counts[cat]}</div>'
         f'<div class="m-lbl">{labels[cat]}</div>'
         f"</div>"
-        for cat in ("S", "I", "R")
+        for cat in categories
     )
     st.markdown(f'<div class="bs-metrics">{cards}</div>', unsafe_allow_html=True)
 

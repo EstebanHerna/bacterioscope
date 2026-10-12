@@ -1,4 +1,4 @@
-"""CLSI M100-Ed33 (2023) breakpoint-based antimicrobial susceptibility classification.
+"""CLSI M100-Ed33 (2023) breakpoint-based susceptibility classification.
 
 What CLSI is
 ------------
@@ -10,6 +10,8 @@ and organism group, the minimum inhibition zone diameters that distinguish:
 
 - **S — Susceptible**: the pathogen is inhibited by the drug at normally
   achievable concentrations.  Standard dosing is likely effective.
+- **SDD — Susceptible-Dose Dependent**: susceptibility depends on an increased
+  exposure regimen specified by CLSI.
 - **I — Intermediate**: the pathogen is inhibited at higher-than-normal
   concentrations or at body sites where the drug concentrates.  Dose
   escalation or local therapy may be effective.
@@ -31,11 +33,12 @@ What this module contains
     Gram-negative Enterobacteriaceae (e.g. *E. coli*, *K. pneumoniae*).
 ``CLSIClassifier``
     A class that looks up an antibiotic in the table and compares a measured
-    zone diameter to return a ``SusceptibilityResult`` with the S/I/R category.
+    zone diameter to return a ``SusceptibilityResult`` with the S/SDD/I/R category.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 
@@ -49,11 +52,13 @@ class SusceptibilityResult:
         zone_diameter_mm: Measured inhibition zone diameter in millimetres.
             This is the clinically meaningful measurement.
         category: CLSI classification — ``'S'`` (Susceptible),
-            ``'I'`` (Intermediate), ``'R'`` (Resistant), or ``'UNKNOWN'``
+            ``'SDD'`` (Susceptible-Dose Dependent), ``'I'`` (Intermediate),
+            ``'R'`` (Resistant), or ``'UNKNOWN'``
             if the antibiotic was not found in the breakpoint table.
         breakpoints: Dictionary of the CLSI threshold values used for this
             antibiotic.  Keys: ``'S'`` (susceptible threshold),
-            ``'I_low'``, ``'I_high'`` (intermediate range),
+            ``'SDD_low'``, ``'SDD_high'`` (when defined),
+            ``'I_low'``, ``'I_high'`` (intermediate range when defined),
             ``'R'`` (resistant threshold).  Empty dict when UNKNOWN.
     """
     antibiotic: str
@@ -69,18 +74,36 @@ CLSI_2023_ENTEROBACTERIACEAE: dict[str, dict[str, float]] = {
     "doripenem": {"S": 23.0, "I_low": 20.0, "I_high": 22.0, "R": 19.0},
     "ampicillin": {"S": 17.0, "I_low": 14.0, "I_high": 16.0, "R": 13.0},
     "amoxicillin-clavulanate": {"S": 18.0, "I_low": 14.0, "I_high": 17.0, "R": 13.0},
-    "piperacillin-tazobactam": {"S": 21.0, "I_low": 18.0, "I_high": 20.0, "R": 17.0},
+    "piperacillin-tazobactam": {"S": 25.0, "SDD_low": 21.0, "SDD_high": 24.0, "R": 20.0},
     "ceftriaxone": {"S": 23.0, "I_low": 20.0, "I_high": 22.0, "R": 19.0},
     "ceftazidime": {"S": 21.0, "I_low": 18.0, "I_high": 20.0, "R": 17.0},
-    "cefepime": {"S": 25.0, "I_low": 19.0, "I_high": 24.0, "R": 18.0},
+    "cefepime": {"S": 25.0, "SDD_low": 19.0, "SDD_high": 24.0, "R": 18.0},
     "ciprofloxacin": {"S": 26.0, "I_low": 22.0, "I_high": 25.0, "R": 21.0},
     "levofloxacin": {"S": 17.0, "I_low": 14.0, "I_high": 16.0, "R": 13.0},
-    "gentamicin": {"S": 15.0, "I_low": 13.0, "I_high": 14.0, "R": 12.0},
-    "amikacin": {"S": 17.0, "I_low": 15.0, "I_high": 16.0, "R": 14.0},
+    "gentamicin": {"S": 18.0, "I_low": 15.0, "I_high": 17.0, "R": 14.0},
+    "amikacin": {"S": 20.0, "I_low": 17.0, "I_high": 19.0, "R": 16.0},
     "trimethoprim-sulfamethoxazole": {"S": 16.0, "I_low": 11.0, "I_high": 15.0, "R": 10.0},
 }
 
 BREAKPOINT_TABLE_VERSION: str = "CLSI M100-Ed33 2023"
+
+CLSI_DISK_CONTENT_UG: dict[str, str] = {
+    "meropenem": "10",
+    "imipenem": "10",
+    "ertapenem": "10",
+    "doripenem": "10",
+    "ampicillin": "10",
+    "amoxicillin-clavulanate": "20/10",
+    "piperacillin-tazobactam": "100/10",
+    "ceftriaxone": "30",
+    "ceftazidime": "30",
+    "cefepime": "30",
+    "ciprofloxacin": "5",
+    "levofloxacin": "5",
+    "gentamicin": "10",
+    "amikacin": "30",
+    "trimethoprim-sulfamethoxazole": "1.25/23.75",
+}
 
 LAST_LINE_ANTIBIOTICS: frozenset[str] = frozenset(
     {"meropenem", "imipenem", "ertapenem", "doripenem"}
@@ -92,7 +115,7 @@ BREAKPOINT_TABLES: dict[str, dict[str, dict[str, float]]] = {
 
 
 class CLSIClassifier:
-    """Classifies zone diameters into S/I/R using CLSI 2023 breakpoints.
+    """Classifies zone diameters using CLSI M100-Ed33 (2023) breakpoints.
 
     The classifier normalises the antibiotic name (lowercase, spaces →
     hyphens), looks it up in the breakpoint table for the specified organism
@@ -100,7 +123,8 @@ class CLSIClassifier:
 
     If the antibiotic is not in the table (e.g. a misspelling, or a disk
     named "disk_0" by the Hough fallback), the result is UNKNOWN with
-    empty breakpoints.
+    empty breakpoints. Whole-millimeter criteria use nearest-mm rounding;
+    the original measured diameter is retained in the result.
 
     Attributes:
         organism_group: Bacterial species group for breakpoint lookup.
@@ -124,20 +148,32 @@ class CLSIClassifier:
                 returned by the zone segmenter.
 
         Returns:
-            ``SusceptibilityResult`` with the category set to ``'S'``,
+            ``SusceptibilityResult`` with the category ``'S'``, ``'SDD'``,
             ``'I'``, ``'R'``, or ``'UNKNOWN'`` and the thresholds used.
         """
         key = self._normalize_antibiotic(antibiotic)
         breakpoints = self.table.get(key, {})
 
-        if not breakpoints:
+        if not breakpoints or not math.isfinite(zone_diameter_mm) or zone_diameter_mm < 0:
             category = "UNKNOWN"
-        elif zone_diameter_mm >= breakpoints["S"]:
-            category = "S"
-        elif zone_diameter_mm <= breakpoints.get("R", 0):
-            category = "R"
         else:
-            category = "I"
+            whole_mm = math.floor(zone_diameter_mm + 0.5)
+            if whole_mm >= breakpoints["S"]:
+                category = "S"
+            elif (
+                "SDD_low" in breakpoints
+                and breakpoints["SDD_low"] <= whole_mm <= breakpoints["SDD_high"]
+            ):
+                category = "SDD"
+            elif whole_mm <= breakpoints.get("R", -math.inf):
+                category = "R"
+            elif (
+                "I_low" in breakpoints
+                and breakpoints["I_low"] <= whole_mm <= breakpoints["I_high"]
+            ):
+                category = "I"
+            else:
+                category = "UNKNOWN"
 
         return SusceptibilityResult(
             antibiotic=antibiotic,

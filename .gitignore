@@ -11,6 +11,7 @@ build/
 *.pth
 data/raw/
 data/processed/*
+!data/processed/uzh_derived_clsi_ed33_labels.csv
 !data/processed/pair_annotations/
 !data/processed/validation_figures/
 data/processed/pair_annotations/*_numbered.png

@@ -8,10 +8,11 @@ Build **BacterioScope Lab Review Assistant**, a hackathon research/demo workflow
 
 ## Current snapshot
 
-- Repository: `EstebanHerna/bacterioscope`; current integration branch `feat/p2-integration-hardening`, based on merged `main` commit `fab21e8`.
+- Repository: `EstebanHerna/bacterioscope`; current integration base `main` at `1414305`. This work session is on `feat/p2-ed33-groundtruth`.
 - Existing system: Streamlit, FastAPI `/analyze`, CLI, image pipeline, HTML/JSON reports, CLSI M100-Ed33 (2023) classifier, traceability, and CI.
 - Documented limits: label OCR is not usable; identity/panel selection remains manual; real-photo identity-matched EA is 32.9% on a 20-image subset; S/I/R agreement against a CLSI-compatible reference is not validated.
 - UZH/Dryad provides EUCAST-provenance data, but the deposited `Overview GPT JCM.xlsx` is an unverified summary whose role may be model output. It must not be treated as evaluation ground truth until Dryad/the authors confirm it. The repository also records EUCAST 2022 in the README and breakpoint-table v13.1 (2023) in the paper; do not silently resolve this.
+- Ed33 reference derivation: the owner authorized deriving categories from the project's Ed33 classifier; the branch corrects sourced gentamicin, amikacin, cefepime, and piperacillin-tazobactam criteria and now preserves SDD. The reproducible UZH sidecar generator is `scripts/derive_uzh_clsi_ed33_labels.py`. Its labels are derived from the same classifier, not independent ground truth or clinical validation; EUCAST source categories remain unchanged. See `docs/CLSI_ED33_GROUND_TRUTH_AUDIT.md`.
 - Persona 2 code: three deterministic AST rule-tool entry points, a separate zone-based ESBL screen tool, an empty Ed33 JSON catalog, and Ed36 draft catalogs with five intrinsic-resistance checks and eight disk-screen criteria. The Ed36 rules are unavailable by default; the project owner supplied the source PDF and attested authorization. Esteban owns the pipeline edition and agent schema; the merged `review_plate()` integration is being hardened on this branch. Also includes a fixed-query Tavily client for `ins.gov.co` and `paho.org`, UZH CSV/workbook label extraction with source metadata, and focused tests per tool.
 - No clinical rule content is enabled. The owner reports that clinical review is complete, but traceable reviewer identity/qualification, review date, and exact candidate scope were not supplied; the Ed36 catalog therefore remains fail-closed. The Ed33 catalog is empty because the only supplied CLSI source/candidates are Ed36 and cannot be relabeled as Ed33. A live Tavily smoke check against INS and OPS is recorded below and in `docs/TEAM_EXECUTION_PLAN.md`; provider keys remain outside the repo.
 - This work is pinned to Dryad archive version `v20241013` (2024-10-13); no January 2026 dataset is used. The local raw archive is fully extracted. Its `Tables.zip` has 225 per-isolate DOCX measurement tables plus 225 macOS metadata sidecars and the `Overview GPT JCM.xlsx` workbook, but no `measurements.csv`. `prepare_dataset.py` parses the DOCX tables and has regenerated the ignored `data/processed/ground_truth.csv` with 3,597 numeric rows for EA/MAE. The workbook's phenotype indicators differ from the paper's reference counts, so the extractor preserves them as unverified `source_reported_codes` and leaves `reference_label_codes` empty. `scripts/download_data.py` now detects incomplete outer and nested extraction rather than treating an existing ZIP as proof of completion.
@@ -26,8 +27,9 @@ Build **BacterioScope Lab Review Assistant**, a hackathon research/demo workflow
 4. Five Ed36 intrinsic-resistance checks and eight Ed36 ESBL disk-screen criteria are in draft catalogs based on the owner-supplied source. The classifiers remain on Ed33. The Ed33 rule catalog is empty because Ed36 content cannot be relabeled as Ed33. Never combine Ed33 classifications and Ed36 rule outputs. Carbapenemase rules are not inferred from disk AST; cascades still need local protocol input.
 5. Tavily searches use fixed broad AMR queries against INS or OPS domains and contain no isolate/patient/AST data. Search pages are untrusted context, not standards evidence.
 6. UZH workbook indicators are unverified source-summary values and must not be used as evaluation ground truth until their role is confirmed. Any verified measurement CSV retains EUCAST provenance and cannot validate CLSI categorical agreement.
-7. Public demo data must be non-identifiable; secrets remain server-side and out of logs/repository/browser bundles.
-8. Preserve `POST /analyze`; agent/report integration is additive and coordinated by Esteban.
+7. The Ed33 UZH sidecar is an analytical derivation from reference diameters and the configured classifier. Preserve SDD, exclude wrong disk potencies and unsupported organisms, and never present the sidecar as independent clinical or categorical validation.
+8. Public demo data must be non-identifiable; secrets remain server-side and out of logs/repository/browser bundles.
+9. Preserve `POST /analyze`; agent/report integration is additive and coordinated by Esteban.
 
 See `PRODUCT_ROUTE.md`, `AGENT_ARCHITECTURE.md`, `PERSON_2_RULE_SPEC.md`, `TEAM_EXECUTION_PLAN.md`, and `EVALUATION_HARNESS.md`.
 See `UZH_LABEL_AUDIT.md` for extracted workbook counts, provenance, limits, and reproduction steps.
@@ -58,6 +60,7 @@ See `UZH_LABEL_AUDIT.md` for extracted workbook counts, provenance, limits, and 
 - [x] Reproduced measurement ground truth and EA/MAE from only the Oct 2024 archive's per-isolate DOCX tables; the identity-matched result is 32.9% EA, 6.28 mm MAE, 316 pairs across 20 annotated images. The missing advertised CSV is not required for these metrics; the phenotype workbook remains excluded as reference truth.
 - [x] Filtered AppleDouble image sidecars and fixed punctuation-tolerant isolate/image matching so the pinned archive yields all 3,597 plausible reference rows across 225 images.
 - [x] Reviewed Esteban's merged agent orchestration (`e50c591`): it calls the three expert-rule tools and accepts optional alert results, but had not wired ESBL evaluation or a rule-edition field separate from measurement edition.
+- [x] Corrected sourced Ed33 gentamicin, amikacin, cefepime, and piperacillin-tazobactam criteria; added SDD support through classification/report display, plus tests and a provenance-preserving UZH derivation harness. Committed sidecar: 3,597 rows; 2,083 derived analytical labels. Focused test set: 143 passed. Labels are explicitly marked derived, not independent ground truth.
 
 ### Integration hardening in PR #5 (`feat/p2-integration-hardening`)
 
@@ -74,11 +77,12 @@ See `UZH_LABEL_AUDIT.md` for extracted workbook counts, provenance, limits, and 
 - [ ] Put `TAVILY_API_KEY` in the hosted server-side secret store and have the UI opt into INS/OPS search. The real INS/OPS smoke check already passed on 2026-10-11.
 - [ ] Ask Dryad/the authors to clarify whether `Overview GPT JCM.xlsx` contains model outputs, routine-diagnostic labels, or another summary. Request the advertised `measurements.csv` only to reconcile package contents; zone EA/MAE uses the v20241013 DOCX tables. Continue excluding workbook phenotype values from evaluation and reconcile EUCAST edition from README/paper.
 - [ ] Daniel builds the job and reports requested metrics only when the reference standard is compatible; otherwise mark CLSI categorical metrics unavailable.
+- [ ] Independently verify every remaining classifier drug/organism breakpoint row against the full authorized Ed33 source before presenting the sidecar as a separately sourced categorical benchmark. Ed33 CA/VME/ME/mE remain unavailable as claims of independent or clinical validation.
 - [ ] Sebastian integrates the visible “rule catalog unavailable” state and public alert citations against the current report contract.
 
 ## Next concrete action
 
-P4 must call the report path with the selected rule edition, any optional ESBL inputs, and server-side Tavily search, then display the resulting states. Keep clinical catalogs unavailable until the correct-edition source and traceable qualified review are recorded. Daniel should continue excluding workbook phenotype indicators from reference metrics until Dryad/the authors clarify their meaning.
+Run `scripts/derive_uzh_clsi_ed33_labels.py` against the pinned v20241013 CSVs, inspect included/excluded counts, and hand Daniel the sidecar plus its limitations. Do not present sidecar-derived categories as independent CA/VME/ME/mE validation. Separately, P4 can continue wiring the existing report statuses and public-alert citations.
 
 ## Change log
 
@@ -91,6 +95,7 @@ P4 must call the report path with the selected rule edition, any optional ESBL i
 | 2026-10-08 | Rechecked UZH workbook semantics against the Dryad record and JCM paper. Filename and count discrepancies mean `Overview GPT JCM.xlsx` cannot be treated as reference labels yet; extractor now stores its labels separately and leaves reference codes empty. | Re-extracted all 225 rows; workbook provenance is unverified and reference-code fields are empty. Focused P2 suite: 40 passed. Ask Dryad/authors to clarify the workbook and missing CSV before Daniel evaluates against it. |
 | 2026-10-09 | Clarified that the retained education fixtures are not the lab-review AST evaluation harness. Fixed Ruff, Bandit, and mypy findings in Persona 2 code and reran the repository checks. | Ruff, Bandit, mypy passed; 313 tests passed at 92.25% coverage. Local `pip-audit` did not return; verify its CI result. |
 | 2026-10-11 | Fixed recursive Dryad archive discovery and resumable extraction; excluded the outer archive from nested extraction; ignored macOS sidecars and normalized isolate/image punctuation. Rebuilt ground truth and reran the documented 80-image measurement evaluation using only archive `v20241013`. | 3,597 numeric references across 225 images; 46 focused P2/data-prep tests passed; Ruff passed. Reproduced 32.9% identity-matched EA, 6.28 mm MAE, r=0.193 (316 pairs), and 38.1% rank-order EA / 3.93 mm MAE (944 pairs). |
+| 2026-10-12 | Applied Esteban's edition split: Ed33 for classifier-derived categories and Ed36 for phenotype-rule candidates. Corrected sourced Ed33 rows, added SDD support, tests, and committed the provenance-preserving UZH sidecar (3,597 rows; 2,083 derived). | Focused tests: 143 passed; Ruff and compileall passed. Labels are derived from reference zones using the project's classifier, not independent validation. EUCAST categories and disk mismatches are preserved/explicitly excluded. |
 
 ## Resume checklist
 

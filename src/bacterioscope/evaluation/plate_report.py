@@ -175,6 +175,7 @@ def _css_table() -> str:
         "font-size:12px;font-weight:600;border:1px solid currentColor}"
         ".badge.S{color:var(--bs-cat-susceptible)}"
         ".badge.I{color:var(--bs-cat-intermediate)}"
+        ".badge.SDD{color:var(--bs-cat-intermediate)}"
         ".badge.R{color:var(--bs-cat-resistant)}"
         ".flag{display:inline-block;background:var(--bs-bg-raised);"
         "border:1px solid var(--bs-quality-warning);"
@@ -238,7 +239,7 @@ def _image_to_b64(image: npt.NDArray[Any]) -> str:
 
 
 def _category_cell(cat: str) -> str:
-    if cat not in ("S", "I", "R"):
+    if cat not in ("S", "SDD", "I", "R"):
         return f"<td>{cat}</td>"
     return f'<td><span class="badge {cat}">{cat}</span></td>'
 
@@ -300,7 +301,7 @@ def _disk_thumb_html(
     if not ok:
         return ""
     b64 = base64.b64encode(buf.tobytes()).decode()
-    is_sir = category in ("S", "I", "R")
+    is_sir = category in ("S", "SDD", "I", "R")
     badge = f'<span class="badge {category}">{label}</span>' if is_sir else label
     return (
         '<div class="disk-thumb">'

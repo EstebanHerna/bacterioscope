@@ -1,6 +1,6 @@
 # Persona 2: clinical rules, Tavily, and UZH labels
 
-**Owner:** Luis. **Integration owner:** Esteban. **Current status:** deterministic rule tools and focused tests are implemented; 225 workbook-derived UZH records have been extracted, but their phenotype role is unverified and they are blocked from use as evaluation ground truth. The Oct 2024 Dryad archive's per-isolate DOCX tables supply numeric reference measurements for EA/MAE; the missing advertised CSV does not block that path. M100-Ed36 candidate data includes five draft intrinsic-resistance checks and eight draft ESBL disk-screen criteria from the PDF the project owner supplied and authorized for project use. The Ed33 catalog is empty because the classifier edition is Ed33 (2023), while the supplied CLSI PDF and derived candidates are Ed36 (2026); rules cannot be copied across editions. The Ed36 catalog remains unavailable until a qualified review is traceably recorded. A real Tavily INS/OPS smoke check is recorded in the team plan; provider keys remain in local runtime secrets.
+**Owner:** Luis. **Integration owner:** Esteban. **Current status:** deterministic rule tools and focused tests are implemented; 225 workbook-derived UZH records have been extracted, but their phenotype role is unverified and they remain excluded from phenotype evaluation. The Oct 2024 Dryad archive's per-isolate DOCX tables supply numeric reference measurements. M100-Ed36 candidate data includes five draft intrinsic-resistance checks and eight draft ESBL disk-screen criteria; the Ed36 catalog remains unavailable until review provenance can be traced. Esteban's edition split is followed: Ed33 classifier-derived categories and Ed36 phenotype-rule candidates remain separate. Sourced Ed33 changes corrected in the classifier include gentamicin, amikacin, cefepime SDD, and piperacillin-tazobactam SDD. The UZH Ed33 sidecar generator and boundary/transform tests are implemented; it marks labels as derived, preserves EUCAST categories, and excludes disk potency mismatches. A real Tavily INS/OPS smoke check is recorded in the team plan; provider keys remain in local runtime secrets. See [`CLSI_ED33_GROUND_TRUTH_AUDIT.md`](CLSI_ED33_GROUND_TRUTH_AUDIT.md) for sources, scope, and limitations.
 
 ## Scope assigned by the team
 
@@ -98,7 +98,7 @@ Work in this order so rule outputs cannot be attached to the wrong organism,
 drug, or standard:
 
 1. **Use the integrated P1 boundary.** Esteban's merged `review_plate()` now
-   accepts organism identity explicitly, normalizes antibiotic codes and S/I/R
+   accepts organism identity explicitly, normalizes antibiotic codes and S/SDD/I/R
    categories, and emits the pipeline edition separately from `rule_standard`.
    The current pipeline result still does not retain the configured organism
    group, so its caller must supply it; unknown drug labels remain unmapped.

@@ -90,6 +90,7 @@ CATEGORY_TOKENS: frozenset[str] = frozenset(
 CATEGORY_MAP: dict[str, str] = {
     "S": "cat_susceptible",
     "I": "cat_intermediate",
+    "SDD": "cat_intermediate",
     "R": "cat_resistant",
 }
 
@@ -165,14 +166,14 @@ def category_color(category: str, mode: Mode) -> str:
     """Return the hex color for a classification category.
 
     Args:
-        category: One of 'S', 'I', 'R'.
+        category: One of 'S', 'SDD', 'I', 'R'.
         mode: Either 'dark' or 'light'.
 
     Returns:
         Hex color string for the given category.
 
     Raises:
-        KeyError: When category is not one of S, I, R.
+        KeyError: When category is not one of S, SDD, I, R.
     """
     token = CATEGORY_MAP[category]
     return palette(mode)[token]
