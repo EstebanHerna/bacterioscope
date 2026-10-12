@@ -63,16 +63,21 @@
               },
               "included_in_rule_evaluation": {
                 "type": "boolean",
-                "description": "false when normalize_ast_observations() skipped this disk (UNKNOWN category or a duplicate antibiotic code) before calling the rule tools."
+                "description": "false when normalize_ast_observations() skipped this disk because its identity/category was unresolved, it duplicated a drug code, or it carried any pipeline quality flag."
               },
               "exclusion_reason": {
                 "type": ["string", "null"],
-                "description": "Set exactly when included_in_rule_evaluation is false, e.g. 'unresolved_antibiotic_identity' or 'duplicate_antibiotic_code:<code>'."
+                "description": "Set exactly when included_in_rule_evaluation is false, e.g. 'unresolved_antibiotic_identity', 'duplicate_antibiotic_code:<code>', or 'measurement_quality_flags:<flags>'."
               }
             }
           }
         }
       }
+    },
+    "rule_standard": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Independent standard/edition selected for expert-rule evaluation. It may differ from measurement.standard and is always explicit in the report."
     },
     "rule_findings": {
       "type": "array",
@@ -161,6 +166,10 @@
           "published_date": {"type": ["string", "null"]}
         }
       }
+    },
+    "alert_search_status": {
+      "enum": ["not_requested", "provided", "available", "no_results", "partial", "unavailable"],
+      "description": "Explicit outcome of the optional fixed-query INS/OPS search; unavailable or no_results is distinct from evidence that no alert exists."
     },
     "catalog_status": {
       "type": "object",

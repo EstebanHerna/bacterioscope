@@ -42,13 +42,22 @@ class NormalizedObservations:
 
 
 def _exclusion_reason(
-    category: str, antibiotic: str, seen_codes: dict[str, int]
+    category: str,
+    antibiotic: str,
+    quality_flags: tuple[str, ...],
+    seen_codes: dict[str, int],
+    disk_index: int,
 ) -> str | None:
-    if category == "UNKNOWN":
+    if category == "UNKNOWN" or not antibiotic.strip():
         return _UNRESOLVED_REASON
     code = antibiotic.strip().upper()
     if code in seen_codes:
         return f"duplicate_antibiotic_code:{antibiotic}"
+    # Reserve the identity even if the measurement is flagged. A duplicate
+    # remains ambiguous and must not enter rule evaluation by accident.
+    seen_codes[code] = disk_index
+    if quality_flags:
+        return f"measurement_quality_flags:{','.join(quality_flags)}"
     return None
 
 
@@ -60,7 +69,7 @@ def normalize_ast_observations(result: AnalysisResult) -> NormalizedObservations
     either). Most real plates today still carry UNKNOWN disks -- no
     antibiotic has been assigned yet, by panel or manually (see app.py) --
     so every disk is kept in the richer ``measurement`` list for the report,
-    and only the subset that is both identified and unique is passed on as
+    and only the subset that is identified, unique, and quality-flag-free is passed on as
     ASTObservation for rule evaluation. Each skip is recorded with a reason
     rather than silently dropped.
 
@@ -78,10 +87,11 @@ def normalize_ast_observations(result: AnalysisResult) -> NormalizedObservations
 
     for i, cls in enumerate(result.classifications):
         flags = tuple(result.flags[i]) if i < len(result.flags) else ()
-        reason = _exclusion_reason(cls.category, cls.antibiotic, seen_codes)
+        reason = _exclusion_reason(
+            cls.category, cls.antibiotic, flags, seen_codes, disk_index=i
+        )
         included = reason is None
         if included:
-            seen_codes[cls.antibiotic.strip().upper()] = i
             observations.append(
                 ASTObservation(antibiotic_code=cls.antibiotic, category=cls.category)
             )

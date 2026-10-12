@@ -8,12 +8,12 @@ Build **BacterioScope Lab Review Assistant**, a hackathon research/demo workflow
 
 ## Current snapshot
 
-- Repository: `EstebanHerna/bacterioscope`; branch `feat/rules`; base commit `d857fe3`.
+- Repository: `EstebanHerna/bacterioscope`; current integration branch `feat/p2-integration-hardening`, based on merged `main` commit `fab21e8`.
 - Existing system: Streamlit, FastAPI `/analyze`, CLI, image pipeline, HTML/JSON reports, CLSI M100-Ed33 (2023) classifier, traceability, and CI.
 - Documented limits: label OCR is not usable; identity/panel selection remains manual; real-photo identity-matched EA is 32.9% on a 20-image subset; S/I/R agreement against a CLSI-compatible reference is not validated.
 - UZH/Dryad provides EUCAST-provenance data, but the deposited `Overview GPT JCM.xlsx` is an unverified summary whose role may be model output. It must not be treated as evaluation ground truth until Dryad/the authors confirm it. The repository also records EUCAST 2022 in the README and breakpoint-table v13.1 (2023) in the paper; do not silently resolve this.
-- New Persona 2 code: three deterministic AST rule-tool entry points, a separate zone-based ESBL screen tool, an empty Ed33 JSON catalog, and Ed36 draft catalogs with five intrinsic-resistance checks and eight disk-screen criteria. The Ed36 rules are unavailable by default; the project owner supplied the source PDF and attested authorization. Esteban still owns the pipeline edition and integration contract. Also includes a fixed-query Tavily client for `ins.gov.co` and `paho.org`, UZH CSV/workbook label extraction with source metadata, and focused tests per tool.
-- No clinical rule content is enabled. The owner reports that clinical review is complete, but traceable reviewer identity/qualification, review date, and exact candidate scope were not supplied; the Ed36 catalog therefore remains fail-closed. A live Tavily smoke check against INS and OPS is recorded below and in `docs/TEAM_EXECUTION_PLAN.md`; provider keys remain outside the repo.
+- Persona 2 code: three deterministic AST rule-tool entry points, a separate zone-based ESBL screen tool, an empty Ed33 JSON catalog, and Ed36 draft catalogs with five intrinsic-resistance checks and eight disk-screen criteria. The Ed36 rules are unavailable by default; the project owner supplied the source PDF and attested authorization. Esteban owns the pipeline edition and agent schema; the merged `review_plate()` integration is being hardened on this branch. Also includes a fixed-query Tavily client for `ins.gov.co` and `paho.org`, UZH CSV/workbook label extraction with source metadata, and focused tests per tool.
+- No clinical rule content is enabled. The owner reports that clinical review is complete, but traceable reviewer identity/qualification, review date, and exact candidate scope were not supplied; the Ed36 catalog therefore remains fail-closed. The Ed33 catalog is empty because the only supplied CLSI source/candidates are Ed36 and cannot be relabeled as Ed33. A live Tavily smoke check against INS and OPS is recorded below and in `docs/TEAM_EXECUTION_PLAN.md`; provider keys remain outside the repo.
 - This work is pinned to Dryad archive version `v20241013` (2024-10-13); no January 2026 dataset is used. The local raw archive is fully extracted. Its `Tables.zip` has 225 per-isolate DOCX measurement tables plus 225 macOS metadata sidecars and the `Overview GPT JCM.xlsx` workbook, but no `measurements.csv`. `prepare_dataset.py` parses the DOCX tables and has regenerated the ignored `data/processed/ground_truth.csv` with 3,597 numeric rows for EA/MAE. The workbook's phenotype indicators differ from the paper's reference counts, so the extractor preserves them as unverified `source_reported_codes` and leaves `reference_label_codes` empty. `scripts/download_data.py` now detects incomplete outer and nested extraction rather than treating an existing ZIP as proof of completion.
 - Persona owners: Esteban P1 agent/integration, Luis P2 clinical tools/sources, Daniel P3 evaluation/Nebius, Sebastian P4 product/delivery.
 - Previous geometry-only education examples remain draft artifacts and are not the current P2 work package or primary product route.
@@ -23,7 +23,7 @@ Build **BacterioScope Lab Review Assistant**, a hackathon research/demo workflow
 1. Keep the hackathon story focused on a traceable lab-review prototype, not mass consumer adoption or autonomous diagnosis.
 2. Deterministic code owns measurements, S/I/R calculations, approved rule conditions, cascade output, and source validation. Nemotron summarizes supplied evidence only.
 3. The classifier currently uses Ed33. Esteban must coordinate any edition change; never mix rule editions or label Ed33 “current.”
-4. Five Ed36 intrinsic-resistance checks and eight Ed36 ESBL disk-screen criteria are in draft catalogs based on the owner-supplied, owner-authorized source. The classifiers remain on Ed33. Never combine Ed33 classifications and Ed36 rule outputs. Carbapenemase rules are not inferred from disk AST; cascades still need local protocol input.
+4. Five Ed36 intrinsic-resistance checks and eight Ed36 ESBL disk-screen criteria are in draft catalogs based on the owner-supplied source. The classifiers remain on Ed33. The Ed33 rule catalog is empty because Ed36 content cannot be relabeled as Ed33. Never combine Ed33 classifications and Ed36 rule outputs. Carbapenemase rules are not inferred from disk AST; cascades still need local protocol input.
 5. Tavily searches use fixed broad AMR queries against INS or OPS domains and contain no isolate/patient/AST data. Search pages are untrusted context, not standards evidence.
 6. UZH workbook indicators are unverified source-summary values and must not be used as evaluation ground truth until their role is confirmed. Any verified measurement CSV retains EUCAST provenance and cannot validate CLSI categorical agreement.
 7. Public demo data must be non-identifiable; secrets remain server-side and out of logs/repository/browser bundles.
@@ -57,19 +57,28 @@ See `UZH_LABEL_AUDIT.md` for extracted workbook counts, provenance, limits, and 
 - [x] Fast-forwarded the P2 branch to current `main` and fixed resumable Dryad ZIP extraction, with focused coverage for partial outer/nested archives.
 - [x] Reproduced measurement ground truth and EA/MAE from only the Oct 2024 archive's per-isolate DOCX tables; the identity-matched result is 32.9% EA, 6.28 mm MAE, 316 pairs across 20 annotated images. The missing advertised CSV is not required for these metrics; the phenotype workbook remains excluded as reference truth.
 - [x] Filtered AppleDouble image sidecars and fixed punctuation-tolerant isolate/image matching so the pinned archive yields all 3,597 plausible reference rows across 225 images.
+- [x] Reviewed Esteban's merged agent orchestration (`e50c591`): it calls the three expert-rule tools and accepts optional alert results, but had not wired ESBL evaluation or a rule-edition field separate from measurement edition.
+
+### Current integration hardening (branch `feat/p2-integration-hardening`, not yet merged)
+
+- Separate `rule_standard` from `measurement.standard` in the report and allow the caller to opt into a distinct rule edition.
+- Invoke the ESBL evaluator only when the caller supplies an explicit ESBL edition and typed assay/disk inputs; the draft Ed36 catalog still returns unavailable.
+- Exclude any disk with a pipeline quality flag from the expert-rule observations, and preserve the exclusion reason in the report.
+- Let the report caller opt into fixed INS/OPS Tavily queries; report `available`, `no_results`, `partial`, or `unavailable` without stopping plate review.
+- Focused integration suite passed: **94 passed**; Ruff, compilation, schema parsing, and whitespace checks passed. Remote CI remains pending until a PR is opened.
 
 ### Blockers / follow-up
 
-- [ ] Esteban replaces/extends the earlier education-only report schema, maps pipeline output to `ASTObservation`, passes quality flags and the ESBL zone/assay fields, and confirms the standard edition the agent pipeline will use.
-- [ ] Keep Ed36 rule catalogs unavailable until the pipeline is explicitly on Ed36 and catalog activation is approved under the team's intended-use policy. The project owner should retain the authorization record and confirm its scope for public distribution.
-- [ ] Keep the user's Tavily key in a private runtime secret; it is not present in this Codex process. The team already recorded a real INS/OPS smoke check on 2026-10-11.
+- [x] Focused integration-hardening suite passed: **94 passed**; Ruff, Python compilation, JSON schema parsing, and `git diff --check` passed. CI is still pending. The caller/UI must provide the chosen rule edition and, for ESBL, exact disk identity/potency, zone, quality acceptance, and assay context.
+- [ ] Keep Ed36 rules unavailable until a named qualified reviewer, review date, and exact candidate scope are recorded. Owner permission to use a source is separate from clinical review and does not fill those fields.
+- [ ] Put `TAVILY_API_KEY` in the hosted server-side secret store and have the UI opt into INS/OPS search. The real INS/OPS smoke check already passed on 2026-10-11.
 - [ ] Ask Dryad/the authors to clarify whether `Overview GPT JCM.xlsx` contains model outputs, routine-diagnostic labels, or another summary. Request the advertised `measurements.csv` only to reconcile package contents; zone EA/MAE uses the v20241013 DOCX tables. Continue excluding workbook phenotype values from evaluation and reconcile EUCAST edition from README/paper.
 - [ ] Daniel builds the job and reports requested metrics only when the reference standard is compatible; otherwise mark CLSI categorical metrics unavailable.
 - [ ] Sebastian integrates the visible “rule catalog unavailable” state and public alert citations after Esteban freezes the report contract.
 
 ## Next concrete action
 
-Esteban should freeze the agent input/output fields and confirm the target CLSI edition, including how it will preserve raw antimicrobial identity, disk potency, zone diameter, assay context, and measurement quality for the ESBL screen. Luis can then map the `RuleEvaluation`, ESBL screen, and `PublicAlert` outputs into the shared contract. Keep Ed36 rules unavailable unless the pipeline explicitly uses Ed36. Daniel should exclude the workbook-derived labels from reference metrics until Dryad/the authors clarify their source role.
+Publish `feat/p2-integration-hardening` and inspect CI before merging. P4 must call the report path with the selected rule edition, any optional ESBL inputs, and server-side Tavily search, then display the resulting states. Keep clinical catalogs unavailable until the correct-edition source and traceable qualified review are recorded. Daniel should continue excluding workbook phenotype indicators from reference metrics until Dryad/the authors clarify their meaning.
 
 ## Change log
 

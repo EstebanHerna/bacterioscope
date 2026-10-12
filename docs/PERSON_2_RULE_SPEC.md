@@ -1,6 +1,6 @@
 # Persona 2: clinical rules, Tavily, and UZH labels
 
-**Owner:** Luis. **Integration owner:** Esteban. **Current status:** deterministic rule tools and focused tests are implemented; 225 workbook-derived UZH records have been extracted, but their phenotype role is unverified and they are blocked from use as evaluation ground truth. The Oct 2024 Dryad archive's per-isolate DOCX tables supply numeric reference measurements for EA/MAE; the missing advertised CSV does not block that path. M100-Ed36 candidate data includes five draft intrinsic-resistance checks and eight draft ESBL disk-screen criteria from the PDF the project owner supplied and said is authorized. The Ed36 catalog remains unavailable until its reviewer record and P1 input/edition gate are complete. A real Tavily INS/OPS smoke check is recorded in the team plan; provider keys remain in local runtime secrets.
+**Owner:** Luis. **Integration owner:** Esteban. **Current status:** deterministic rule tools and focused tests are implemented; 225 workbook-derived UZH records have been extracted, but their phenotype role is unverified and they are blocked from use as evaluation ground truth. The Oct 2024 Dryad archive's per-isolate DOCX tables supply numeric reference measurements for EA/MAE; the missing advertised CSV does not block that path. M100-Ed36 candidate data includes five draft intrinsic-resistance checks and eight draft ESBL disk-screen criteria from the PDF the project owner supplied and authorized for project use. The Ed33 catalog is empty because the classifier edition is Ed33 (2023), while the supplied CLSI PDF and derived candidates are Ed36 (2026); rules cannot be copied across editions. The Ed36 catalog remains unavailable until a qualified review is traceably recorded. A real Tavily INS/OPS smoke check is recorded in the team plan; provider keys remain in local runtime secrets.
 
 ## Scope assigned by the team
 
@@ -43,9 +43,9 @@ evaluate_esbl_screen(
 
 The current Ed36 catalog returns `screen_rules_unavailable`; this example documents the handoff contract, not a live positive clinical result.
 
-The tools load the catalog matching the requested standard. The no-argument/default standard remains the pipeline classifier's CLSI M100-Ed33 (2023), whose catalog is empty. A separate CLSI M100-Ed36 (2026) catalog contains five intrinsic-resistance discordance candidates, each marked `draft`; the project owner supplied the PDF and attested authorization on 2026-10-08. The current execution gate still requires a stable ID/version, source locator and HTTPS citation, matching edition, reuse evidence, and a named qualified reviewer with review date. Exact organism and AST conditions must match. Unknown editions and draft or mismatched rules fail closed. Never send Ed36 rules outputs for an Ed33 result.
+The tools load the catalog matching the requested standard. The no-argument/default standard remains the pipeline classifier's CLSI M100-Ed33 (2023), whose catalog is empty. A separate CLSI M100-Ed36 (2026) catalog contains five intrinsic-resistance discordance candidates, each marked `draft`; it is based on the Ed36 PDF supplied by the project owner. Owner permission to use a source is recorded separately from clinical review. The current execution gate still requires a stable ID/version, source locator and HTTPS citation, matching edition, reuse evidence, and a named qualified reviewer with review date. Exact organism and AST conditions must match. Unknown editions and draft or mismatched rules fail closed. Never send Ed36 rules outputs for an Ed33 result.
 
-The Ed36 inventory and locators are in `docs/CLSI_ED36_RULE_INVENTORY.md`. Eight Ed36 ESBL disk-screen candidates and their deterministic evaluator now exist in `rules/clsi_m100_ed36_esbl_screen.json` and `rules/esbl_screen.py`; all candidates remain draft and unavailable. The evaluator requires exact organism, raw drug identity and potency, measured zone in millimeters, MHA disk-diffusion context, incubation conditions, ambient air, standard inoculum procedure, and an accepted measurement-quality flag. Esteban must decide how those fields enter the agent contract; Luis did not change P1 schemas. Carbapenemase status must not be inferred from disk results. Cascade profiles are institution-specific and need local stewardship input. Tests use synthetic fixtures and prove software behavior, not clinical correctness.
+The Ed36 inventory and locators are in `docs/CLSI_ED36_RULE_INVENTORY.md`. Eight Ed36 ESBL disk-screen candidates and their deterministic evaluator now exist in `rules/clsi_m100_ed36_esbl_screen.json` and `rules/esbl_screen.py`; all candidates remain draft and unavailable. `review_plate()` invokes the evaluator only when the caller supplies an explicit ESBL edition and typed disk/assay inputs. The image pipeline does not capture disk potency or full assay context, so the caller must supply them; incomplete context and draft catalog return unavailable states. Carbapenemase status must not be inferred from disk results. Cascade profiles are institution-specific and need local stewardship input. Tests use synthetic fixtures and prove software behavior, not clinical correctness.
 
 ## P2-2: public-health alert search
 
@@ -57,7 +57,7 @@ Implemented in `src/bacterioscope/integrations/tavily.py` as `TavilyAlertSearch.
 - Returned URLs are checked again against the selected HTTPS domain. Results contain title, URL, snippet, source, and publication date; returned page text is untrusted context, not AST or rule evidence.
 - The key comes only from server-side `TAVILY_API_KEY`. Missing keys and request failures raise typed errors without logging or returning the key. A private live smoke check for both sources is documented in `docs/TEAM_EXECUTION_PLAN.md` (2026-10-11); ordinary tests continue to mock HTTP.
 
-Esteban can call the class through his tool-calling layer and serialize `PublicAlert` fields. The module uses Python's standard library; no new runtime dependency is required. Do not commit the API key or copy it into this document.
+`review_plate()` can run fixed-query search when given `alert_sources=["ins", "ops"]`; it reads the server-side `TAVILY_API_KEY` through `TavilyAlertSearch`, or accepts an injected client for tests. The report carries `alert_search_status` (`available`, `no_results`, `partial`, `unavailable`, `provided`, or `not_requested`) along with eligible alert fields. Search errors do not abort plate review. The module uses Python's standard library; no new runtime dependency is required. Do not commit the API key or copy it into this document.
 
 ## P2-3: UZH/Dryad phenotype indicators and provenance
 
@@ -97,13 +97,13 @@ Tavily returns `PublicAlert(source, title, url, snippet, published_date)`. UZH o
 Work in this order so rule outputs cannot be attached to the wrong organism,
 drug, or standard:
 
-1. **Freeze the shared contract with Esteban.** P1 normalizes pipeline results
-   into explicit organism identity, standard edition, antibiotic codes, S/I/R
-   categories, and per-disk quality flags. The current `AnalysisResult` does
-   not retain the configured organism group, and the REST disk schema does not
-   expose quality flags. P1 should carry these fields through the agent input
-   contract. Unknown drug labels must remain unmapped; do not use fuzzy matching
-   or infer an organism from the image.
+1. **Use the integrated P1 boundary.** Esteban's merged `review_plate()` now
+   accepts organism identity explicitly, normalizes antibiotic codes and S/I/R
+   categories, and emits the pipeline edition separately from `rule_standard`.
+   The current pipeline result still does not retain the configured organism
+   group, so its caller must supply it; unknown drug labels remain unmapped.
+   This branch additionally excludes measurements with quality flags before
+   invoking rule tools. Do not infer an organism from the image.
 2. **Gate before calling rules.** P1 calls the deterministic rule tools only
    when organism, standard, and antibiotic identities are explicit and all
    required measurements pass the agreed quality checks. Missing or flagged
@@ -127,13 +127,14 @@ drug, or standard:
    and retrieval/publication date; search failure or no eligible result is an
    explicit unavailable state. No plate image, isolate identifier, or AST
    vector goes to Tavily.
-6. **Integrate and render.** Esteban assembles pipeline results, the AST/zone
-   rule outputs, and optional alerts into his final validated JSON report.
+6. **Render and evaluate.** Esteban's merged `review_plate()` already assembles
+   pipeline results, the AST/zone rule outputs, and optional alerts into a
+   validated JSON report. This branch hardens those inputs and statuses.
    Daniel evaluates deterministic behavior and latency/cost; workbook-derived
-   values are excluded from reference metrics until their role is confirmed.
-   Sebastian renders rule coverage/status and alert links in Streamlit,
-   including unavailable states and provenance. The agent may explain this
-   evidence bundle but cannot alter it.
+   values stay out of reference metrics until their role is confirmed.
+   Sebastian still needs to wire the optional search and rule-edition inputs
+   into Streamlit and render rule availability, alert links, and provenance.
+   The agent may explain this evidence bundle but cannot alter it.
 
 ### Integration edges
 
@@ -151,8 +152,9 @@ Dryad Tables.zip -> P2 UZH extractor -> provenance-rich phenotype CSV -> P3 eval
 
 ### Definition of done for Persona 2
 
-- P1 accepts the input/output contract and demonstrates a round trip on a
-  sample plate without losing organism, standard, quality flags, or provenance.
+- The merged P1 report path accepts the Persona 2 outputs; caller-level
+  organism identity and rule edition, per-disk quality exclusions, source
+  provenance, and optional ESBL/search states remain explicit in the report.
 - Each enabled rule has exact applicability, a stable ID/version, a source
   locator, reuse evidence, and a named qualified reviewer/date. Otherwise the
   catalog remains disabled and the UI says rules are unavailable.
@@ -164,13 +166,16 @@ Dryad Tables.zip -> P2 UZH extractor -> provenance-rich phenotype CSV -> P3 eval
   image key, and EUCAST version discrepancy remain traceable.
 - Tavily has a private live smoke check for both allowlisted sources, while
   unit tests continue to mock HTTP and verify failure handling.
-- P1, P3, and P4 consume the same documented fields; no team member duplicates
-  clinical rule logic in prompts, evaluation scripts, or UI code.
+- P1 consumes the documented fields. P3/P4 still need to wire and display the
+  same report fields; no team member duplicates clinical rule logic in prompts,
+  evaluation scripts, or UI code.
 
 ## Open gates
 
-- Confirm with Esteban whether the integrated pipeline remains on Ed33 or will move to a licensed, reviewed edition. Do not mix editions.
+- Have the report caller set and display `rule_standard` separately from the pipeline measurement edition. Do not mix editions.
 - Obtain qualified microbiology review for each Ed36 candidate rule; have the project owner retain the authorization record and confirm its scope for public distribution.
-- Keep `TAVILY_API_KEY` in a private runtime secret. A live INS/OPS smoke check is recorded in the team plan.
+- Keep `TAVILY_API_KEY` in a private hosted runtime secret and have the product opt into search. A live INS/OPS smoke check is recorded in the team plan.
 - Resolve with Dryad whether `Overview GPT JCM.xlsx` contains model outputs or routine-diagnostic labels. Do not use those workbook phenotype values as evaluation reference until clarified. The missing advertised `measurements.csv` does not block zone-diameter EA/MAE, which uses the v20241013 DOCX tables. Reconcile the EUCAST edition note against the README and paper.
-- Esteban integrates the three rule entry points and Tavily result fields into the agent tool-call schema; no response-schema changes are made by Luis in this task.
+- `review_plate()` invokes the three AST rule tools, accepts explicit ESBL
+  inputs, and can run Tavily search with an explicit status. P4 still needs to
+  connect the UI to those optional arguments and surface the report status.

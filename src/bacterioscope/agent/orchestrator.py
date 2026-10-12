@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from bacterioscope.agent.contract import normalize_ast_observations
 from bacterioscope.agent.evidence import assemble_evidence, collect_evidence_ids
@@ -25,15 +25,30 @@ from bacterioscope.agent.validator import (
     build_fallback_result,
     validate_and_render,
 )
+from bacterioscope.integrations.tavily import (
+    AlertSource,
+    PublicAlert,
+    TavilyAlertSearch,
+    TavilyConfigurationError,
+    TavilySearchError,
+)
 from bacterioscope.rules import (
+    ESBLScreenContext,
+    ZoneObservation,
     apply_cascade_reporting,
     check_intrinsic_resistance,
+    evaluate_esbl_screen,
     evaluate_phenotype_rules,
 )
 
 if TYPE_CHECKING:
-    from bacterioscope.integrations.tavily import PublicAlert
     from bacterioscope.pipeline import AnalysisResult
+
+
+class AlertSearchClient(Protocol):
+    """Structural type for the server-side Tavily search adapter."""
+
+    def search_amr_alerts(self, source: AlertSource | str) -> list[PublicAlert]: ...
 
 # Not a credential -- a fixed fallback_reason enum value; bandit's hardcoded
 # password heuristic matches the "token..." substring.
@@ -64,26 +79,88 @@ def _build_messages(
     ]
 
 
+def _collect_public_alerts(
+    *,
+    provided: Sequence[PublicAlert],
+    alert_search: AlertSearchClient | None,
+    alert_sources: Sequence[AlertSource | str],
+) -> tuple[tuple[PublicAlert, ...], str]:
+    """Optionally retrieve fixed-query INS/OPS alerts and expose availability."""
+    alerts_by_url = {alert.url: alert for alert in provided}
+    if not alert_sources:
+        return tuple(alerts_by_url.values()), "provided" if provided else "not_requested"
+
+    selected_sources = tuple(dict.fromkeys(AlertSource(source) for source in alert_sources))
+    searcher = alert_search or TavilyAlertSearch()
+    successful_searches = 0
+    failed_searches = 0
+    searches_with_results = 0
+    for source in selected_sources:
+        try:
+            found = searcher.search_amr_alerts(source)
+        except (TavilyConfigurationError, TavilySearchError):
+            failed_searches += 1
+            continue
+        successful_searches += 1
+        if found:
+            searches_with_results += 1
+        for alert in found:
+            alerts_by_url.setdefault(alert.url, alert)
+
+    if failed_searches and (searches_with_results or provided):
+        status = "partial"
+    elif failed_searches:
+        status = "unavailable"
+    elif searches_with_results:
+        status = "available"
+    elif successful_searches and provided:
+        status = "provided"
+    elif successful_searches:
+        status = "no_results"
+    else:
+        status = "provided" if provided else "not_requested"
+    return tuple(alerts_by_url.values()), status
+
+
 def review_plate(
     result: AnalysisResult,
     *,
     organism: str,
     client: TokenFactoryClient,
+    rule_standard: str | None = None,
+    esbl_standard: str | None = None,
+    esbl_context: ESBLScreenContext | None = None,
+    esbl_observations: Sequence[ZoneObservation] = (),
     public_alerts: Sequence[PublicAlert] = (),
+    alert_search: AlertSearchClient | None = None,
+    alert_sources: Sequence[AlertSource | str] = (),
 ) -> ValidationResult:
     """Run the full agent review for one completed pipeline analysis.
 
-    Does not run the ESBL screen: the pipeline does not yet capture disk
-    potency (micrograms) per antibiotic, which ``evaluate_esbl_screen``
-    requires, so ``esbl_screen`` is always None in this build (see
-    agent/evidence.py's docstring for the same note).
+    ``rule_standard`` is independent of the pipeline's breakpoint edition and
+    must be supplied explicitly to evaluate rules against another edition.
+    The ESBL screen runs only when the caller supplies an explicit
+    ``esbl_standard`` and typed disk/assay observations; the pipeline itself
+    does not currently capture disk potency or the full assay context.
 
     Args:
         result: Completed AnalysisResult, after any antibiotic assignment.
         organism: CLSI organism group used for classification.
         client: Configured TokenFactoryClient.
+        rule_standard: Edition used for the expert-rule catalogs. Defaults to
+            the pipeline measurement edition for backwards compatibility.
+        esbl_standard: Explicit edition for the separate zone-based screen.
+        esbl_context: Assay context required by the screen. If the edition is
+            provided without context, an incomplete context is reported.
+        esbl_observations: Exact disk codes, potencies, zones, and quality
+            acceptance values for the separate ESBL screen.
         public_alerts: Optional Tavily PublicAlert results to ground the
             explanation in, already restricted to an official domain.
+        alert_search: Optional server-side Tavily client. Defaults to a client
+            reading ``TAVILY_API_KEY`` from the environment when sources are
+            requested.
+        alert_sources: Optional allowlisted sources to search, ``ins`` and/or
+            ``ops``. Search failures are recorded and do not stop plate review.
 
     Returns:
         ValidationResult with status 'grounded_report' when the model call
@@ -93,17 +170,52 @@ def review_plate(
         error in the evidence assembly itself.
     """
     normalized = normalize_ast_observations(result)
-    standard = result.breakpoint_table_version
+    selected_rule_standard = (
+        result.breakpoint_table_version if rule_standard is None else rule_standard
+    ).strip()
+    if not selected_rule_standard:
+        raise ValueError("rule_standard or result.breakpoint_table_version is required")
+    if esbl_standard is None and (esbl_context is not None or esbl_observations):
+        raise ValueError("esbl_standard is required when ESBL screen inputs are supplied")
+    if esbl_standard is not None:
+        esbl_standard = esbl_standard.strip()
+        if not esbl_standard:
+            raise ValueError("esbl_standard must not be empty")
+    selected_alerts, alert_search_status = _collect_public_alerts(
+        provided=public_alerts,
+        alert_search=alert_search,
+        alert_sources=alert_sources,
+    )
 
     intrinsic = check_intrinsic_resistance(
-        organism=organism, standard=standard, observations=normalized.observations
+        organism=organism, standard=selected_rule_standard,
+        observations=normalized.observations,
     )
     phenotype = evaluate_phenotype_rules(
-        organism=organism, standard=standard, observations=normalized.observations
+        organism=organism, standard=selected_rule_standard,
+        observations=normalized.observations,
     )
     cascade = apply_cascade_reporting(
-        organism=organism, standard=standard, observations=normalized.observations
+        organism=organism, standard=selected_rule_standard,
+        observations=normalized.observations,
     )
+
+    esbl_screen = None
+    if esbl_standard is not None:
+        context = esbl_context or ESBLScreenContext(
+            method=None,
+            medium=None,
+            temperature_c=None,
+            incubation_hours=None,
+            atmosphere=None,
+            standard_disk_diffusion_procedure=None,
+        )
+        esbl_screen = evaluate_esbl_screen(
+            organism=organism,
+            standard=esbl_standard,
+            context=context,
+            observations=esbl_observations,
+        )
 
     deterministic_base = assemble_evidence(
         result,
@@ -112,12 +224,18 @@ def review_plate(
         intrinsic=intrinsic,
         phenotype=phenotype,
         cascade=cascade,
-        rule_standard=standard,
-        public_alerts=public_alerts,
+        rule_standard=selected_rule_standard,
+        esbl_screen=esbl_screen,
+        esbl_standard=esbl_standard,
+        public_alerts=selected_alerts,
+        alert_search_status=alert_search_status,
     )
     evidence_ids = collect_evidence_ids(deterministic_base)
 
-    tier = select_escalation_tier([intrinsic, phenotype, cascade], esbl_screen_signal=None)
+    tier = select_escalation_tier(
+        [intrinsic, phenotype, cascade],
+        esbl_screen_signal=(esbl_screen.screen_signal if esbl_screen is not None else None),
+    )
     if tier is None:
         tier = select_report_tier()
 

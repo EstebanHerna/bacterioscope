@@ -97,6 +97,23 @@ class TestNormalizeAstObservations:
         )
         normalized = normalize_ast_observations(result)
         assert normalized.measurement[0].quality_flags == ("low_circularity", "overlap")
+        assert normalized.observations == ()
+        assert normalized.measurement[0].included_in_rule_evaluation is False
+        assert normalized.measurement[0].exclusion_reason == (
+            "measurement_quality_flags:low_circularity,overlap"
+        )
+
+    def test_flagged_duplicate_cannot_make_later_disk_appear_unique(self) -> None:
+        result = _result(
+            [_cls("ciprofloxacin", 26.0, "S"), _cls("ciprofloxacin", 24.0, "S")],
+            flags=[["overlap"], []],
+        )
+        normalized = normalize_ast_observations(result)
+        assert normalized.observations == ()
+        assert normalized.measurement[0].exclusion_reason == "measurement_quality_flags:overlap"
+        assert normalized.measurement[1].exclusion_reason == (
+            "duplicate_antibiotic_code:ciprofloxacin"
+        )
 
     def test_empty_result_returns_empty(self) -> None:
         normalized = normalize_ast_observations(_result([]))
