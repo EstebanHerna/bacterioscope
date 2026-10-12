@@ -40,7 +40,11 @@ def _openai_error_types() -> tuple[type[BaseException], ...]:
     the 'openai' package is not installed, which only matters for a test
     double injected via the ``client`` constructor argument -- the real SDK
     call path above already fails closed with TokenFactoryConfigurationError
-    before reaching this point if 'openai' is missing.
+    before reaching this point if 'openai' is missing. Known, accepted gap:
+    with 'openai' absent, an exception raised by an injected fake client
+    that is not already one of TokenFactoryRequestError's own direct raises
+    (e.g. the empty-choices check) would propagate uncaught by this layer.
+    Install the 'agent' extra to get the real wrapping behaviour in tests.
     """
     try:
         from openai import OpenAIError

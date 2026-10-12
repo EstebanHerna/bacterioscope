@@ -67,6 +67,26 @@ def _fallback_result(deterministic_base: dict[str, Any], reason: str) -> Validat
     )
 
 
+def build_fallback_result(deterministic_base: dict[str, Any], reason: str) -> ValidationResult:
+    """Build a fallback ValidationResult for failures outside the model-response path.
+
+    Use this when there is no ``model_output`` string at all -- Token Factory
+    was unreachable, unconfigured, or timed out before returning anything --
+    as opposed to ``validate_and_render()``, which validates an actual
+    response.
+
+    Args:
+        deterministic_base: The report dict assembled from the pipeline and
+            Persona 2 tools (see ``validate_and_render``'s docstring).
+        reason: Short machine-readable fallback reason, e.g.
+            'token_factory_unavailable'.
+
+    Returns:
+        ValidationResult with status 'fallback'.
+    """
+    return _fallback_result(deterministic_base, reason)
+
+
 def _extract_explanation_and_citations(parsed: Any) -> tuple[str, list[str]] | None:
     if not isinstance(parsed, dict):
         return None

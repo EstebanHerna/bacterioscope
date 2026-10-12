@@ -89,3 +89,9 @@ python -m pytest --basetemp .pytest-run-uzh -o addopts= tests/test_expert_rules.
 Result on 2026-10-08 before the ESBL screen and provenance correction: 18 passed. A live Tavily request was not part of this
 test; HTTP behavior was mocked at that time. A live key was configured and the request was run for real on
 2026-10-11 -- see docs/TEAM_EXECUTION_PLAN.md's current work package state for the result.
+
+**Independently reproduced on 2026-10-11** by Esteban against the same checked-in `Tables.zip` (SHA-256 verified to
+match the value recorded above before running). The extractor produced 225 rows, all 225 with
+`label_provenance_status = unverified_workbook_summary`, and `source_reported_codes` mechanism totals (a row can carry
+more than one code) of ESBL 113, AMPC 33, CARBAPENEMASE 23, NO_MECHANISM_REPORTED 76 -- an exact match to the counts
+above. Nothing has drifted since the original audit.
