@@ -36,7 +36,7 @@ The image pipeline owns measurements and current S/I/R calculations. Persona 2 t
 | Node | Input | Deterministic responsibility | Output |
 |---|---|---|---|
 | `analyze_plate` | Image plus explicit organism/panel selection | Run existing pipeline and versioned CLSI classifier; preserve quality flags and traceability. | Measurements, categories, standard version, flags. |
-| `normalize_ast_observations` | Pipeline result | Map drug identity and category into the Persona 2 contract; reject duplicates or missing categories. | `organism`, `standard`, `observations[]`. |
+| `normalize_ast_observations` | Pipeline result | Map drug identity and category into the Persona 2 contract; reject duplicates, missing categories, and any disk carrying a pipeline quality flag. | `organism`, `measurement.standard`, `rule_standard`, `observations[]`. |
 | `check_intrinsic_resistance` | AST contract | Apply exact-organism, exact-standard approved rules only. | Sourced conflict findings. |
 | `evaluate_phenotype_rules` | AST contract | Evaluate complete approved category patterns. | Sourced rule findings; no inference from missing observations. |
 | `apply_cascade_reporting` | AST contract | Apply approved reporting rules without modifying any AST category. | Explicit suppressed drug codes and source. |
@@ -77,7 +77,7 @@ The bundled catalog is empty until CLSI content has a confirmed edition, reuse a
 
 The Ed36 ESBL screen is a separate zone-measurement tool in `src/bacterioscope/rules/esbl_screen.py`. It requires the M100 assay context and exact disk potency; its eight bundled Ed36 criteria are draft and return unavailable. Esteban's input contract must preserve raw drug identity, disk potency, diameter in millimeters, and measurement-quality state before wiring this tool. A screen signal is not an ESBL diagnosis; no signal does not rule ESBL out, especially for an incomplete panel.
 
-The existing `contracts/agent-review-v1.schema.json` was drafted for the earlier education workflow. Esteban owns the final lab-review response contract and should replace or extend that draft before wiring clinical tool outputs into the agent.
+The lab-review report contract is `docs/contracts/agent-review-v1.schema.json`. It keeps the measurement edition separate from `rule_standard` and the ESBL screen's own `standard`. The report builder now emits the selected rule edition even when the catalog is empty, so “unavailable” is traceable to an edition.
 
 `TavilyAlertSearch.search_amr_alerts("ins" | "ops")` returns `PublicAlert(source, title, url, snippet, published_date)`. Search results are informational public sources, not clinical evidence. API key is server-side `TAVILY_API_KEY`.
 

@@ -22,6 +22,7 @@ def _deterministic_base(**overrides: object) -> dict[str, object]:
                 },
             ],
         },
+        "rule_standard": "CLSI M100-Ed33 2023",
         "rule_findings": [], "cascade_suppressions": [], "esbl_screen": None,
         "public_alerts": [],
         "catalog_status": {

@@ -12,11 +12,15 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
+import pytest
+
 from bacterioscope.agent.nemotron_client import TokenFactoryClient
 from bacterioscope.agent.orchestrator import review_plate
 from bacterioscope.classification.clsi import SusceptibilityResult
 from bacterioscope.detection.detector import DiskResult
+from bacterioscope.integrations.tavily import PublicAlert, TavilySearchError
 from bacterioscope.pipeline import AnalysisResult
+from bacterioscope.rules import ESBLScreenContext, ZoneObservation
 from bacterioscope.segmentation.watershed import ZoneResult
 
 
@@ -104,6 +108,17 @@ def _configured_client(content: str) -> TokenFactoryClient:
     )
 
 
+class _FakeTavilySearch:
+    def __init__(self, *, results: list[PublicAlert] | None = None, fail: bool = False) -> None:
+        self._results = results or []
+        self._fail = fail
+
+    def search_amr_alerts(self, source: str) -> list[PublicAlert]:
+        if self._fail:
+            raise TavilySearchError("test failure")
+        return self._results
+
+
 class TestReviewPlateSuccess:
     def test_well_formed_model_response_yields_grounded_report(self) -> None:
         content = json.dumps({"explanation": "No concerning findings.", "evidence_ids": []})
@@ -119,8 +134,10 @@ class TestReviewPlateSuccess:
         observations = outcome.report["measurement"]["observations"]
         assert len(observations) == 3
         unresolved = [o for o in observations if not o["included_in_rule_evaluation"]]
-        assert len(unresolved) == 1
-        assert unresolved[0]["exclusion_reason"] == "unresolved_antibiotic_identity"
+        assert len(unresolved) == 2
+        by_index = {o["disk_index"]: o["exclusion_reason"] for o in unresolved}
+        assert by_index[1] == "measurement_quality_flags:low_circularity"
+        assert by_index[2] == "unresolved_antibiotic_identity"
 
     def test_empty_catalog_means_no_rule_findings_today(self) -> None:
         content = json.dumps({"explanation": "ok", "evidence_ids": []})
@@ -134,6 +151,76 @@ class TestReviewPlateSuccess:
         client = _configured_client(content)
         outcome = review_plate(_result(), organism="Escherichia coli", client=client)
         assert outcome.report["esbl_screen"] is None
+
+    def test_rule_standard_is_reported_separately_from_measurement_standard(self) -> None:
+        client = _configured_client(json.dumps({"explanation": "ok", "evidence_ids": []}))
+        outcome = review_plate(
+            _result(), organism="Escherichia coli", client=client,
+            rule_standard="CLSI M100-Ed36 2026",
+        )
+        assert outcome.report["measurement"]["standard"] == "CLSI M100-Ed33 2023"
+        assert outcome.report["rule_standard"] == "CLSI M100-Ed36 2026"
+
+    def test_empty_rule_standard_is_not_silently_replaced(self) -> None:
+        client = _configured_client(json.dumps({"explanation": "ok", "evidence_ids": []}))
+        with pytest.raises(ValueError, match="rule_standard or result.breakpoint_table_version"):
+            review_plate(
+                _result(), organism="Escherichia coli", client=client, rule_standard=" "
+            )
+
+    def test_ed36_esbl_screen_is_explicit_and_fail_closed(self) -> None:
+        client = _configured_client(json.dumps({"explanation": "ok", "evidence_ids": []}))
+        context = ESBLScreenContext(
+            method="disk diffusion", medium="MHA", temperature_c=35,
+            incubation_hours=17, atmosphere="ambient air",
+            standard_disk_diffusion_procedure=True,
+        )
+        outcome = review_plate(
+            _result(), organism="Escherichia coli", client=client,
+            esbl_standard="CLSI M100-Ed36 2026", esbl_context=context,
+            esbl_observations=[ZoneObservation("ceftazidime", 30, 20.0, True)],
+        )
+        assert outcome.report["esbl_screen"]["standard"] == "CLSI M100-Ed36 2026"
+        assert outcome.report["esbl_screen"]["status"] == "screen_rules_unavailable"
+        assert outcome.report["esbl_screen"]["screen_signal"] is None
+
+    def test_esbl_inputs_without_explicit_standard_are_rejected(self) -> None:
+        client = _configured_client(json.dumps({"explanation": "ok", "evidence_ids": []}))
+        try:
+            review_plate(
+                _result(), organism="Escherichia coli", client=client,
+                esbl_observations=[ZoneObservation("ceftazidime", 30, 20.0, True)],
+            )
+        except ValueError as exc:
+            assert "esbl_standard is required" in str(exc)
+        else:
+            raise AssertionError("missing ESBL edition must not be silently inferred")
+
+    def test_tavily_results_and_availability_are_in_report(self) -> None:
+        client = _configured_client(json.dumps({"explanation": "ok", "evidence_ids": [
+            "https://ins.gov.co/alerta",
+        ]}))
+        alert = PublicAlert(
+            source="ins", title="Alerta INS", url="https://ins.gov.co/alerta",
+            snippet="Aviso público", published_date="2026-10-11",
+        )
+        outcome = review_plate(
+            _result(), organism="Escherichia coli", client=client,
+            alert_search=_FakeTavilySearch(results=[alert]), alert_sources=["ins"],
+        )
+        assert outcome.status == "grounded_report"
+        assert outcome.report["alert_search_status"] == "available"
+        assert outcome.report["public_alerts"][0]["url"] == alert.url
+
+    def test_tavily_failure_is_reported_without_stopping_review(self) -> None:
+        client = _configured_client(json.dumps({"explanation": "ok", "evidence_ids": []}))
+        outcome = review_plate(
+            _result(), organism="Escherichia coli", client=client,
+            alert_search=_FakeTavilySearch(fail=True), alert_sources=["ops"],
+        )
+        assert outcome.status == "grounded_report"
+        assert outcome.report["alert_search_status"] == "unavailable"
+        assert outcome.report["public_alerts"] == []
 
 
 class TestReviewPlateFallback:

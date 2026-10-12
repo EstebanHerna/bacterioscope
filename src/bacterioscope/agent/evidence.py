@@ -96,6 +96,7 @@ def assemble_evidence(
     esbl_screen: ESBLScreenResult | None = None,
     esbl_standard: str | None = None,
     public_alerts: Sequence[PublicAlert] = (),
+    alert_search_status: str = "not_requested",
 ) -> dict[str, Any]:
     """Build the deterministic agent-review-v1 report base.
 
@@ -111,13 +112,14 @@ def assemble_evidence(
             tool calls above -- independent of ``esbl_standard`` (dual-
             edition decision, docs/TEAM_EXECUTION_PLAN.md).
         esbl_screen: Optional ESBLScreenResult from ``evaluate_esbl_screen()``.
-            None when disk potency/assay context was not available -- the
-            pipeline does not yet capture disk potency per antibiotic
-            (micrograms), which that tool requires, so this is always None
-            in the current build. A real, open gap, not a placeholder.
+            None when the caller did not provide typed disk potency and assay
+            context. The pipeline does not yet capture disk potency per
+            antibiotic, so callers must supply those fields explicitly.
         esbl_standard: Required when ``esbl_screen`` is not None; the
             standard it was evaluated against (e.g. ``ED36_STANDARD``).
         public_alerts: Optional Tavily ``PublicAlert`` results.
+        alert_search_status: Whether public-alert search was requested and
+            whether eligible results were available.
 
     Returns:
         A dict matching every agent-review-v1 field except ``status``,
@@ -134,10 +136,12 @@ def assemble_evidence(
         "analysis_id": result.analysis_id,
         "organism": organism,
         "measurement": build_measurement_section(result, measurement),
+        "rule_standard": rule_standard,
         "rule_findings": findings,
         "cascade_suppressions": sorted(set(cascade.suppressed_antibiotics)),
         "esbl_screen": _map_esbl_screen(esbl_screen, esbl_standard),
         "public_alerts": _map_alerts(public_alerts),
+        "alert_search_status": alert_search_status,
         "catalog_status": {
             "intrinsic_resistance": intrinsic.catalog_status,
             "phenotype": phenotype.catalog_status,
