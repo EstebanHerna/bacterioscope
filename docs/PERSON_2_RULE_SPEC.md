@@ -1,6 +1,6 @@
 # Persona 2: clinical rules, Tavily, and UZH labels
 
-**Owner:** Luis. **Integration owner:** Esteban. **Current status:** deterministic rule tools and focused tests are implemented; 225 workbook-derived UZH records have been extracted, but their phenotype role is unverified and they are blocked from use as evaluation ground truth. M100-Ed36 candidate data includes five draft intrinsic-resistance checks and eight draft ESBL disk-screen criteria from the PDF the project owner supplied and said is authorized. The Ed36 catalog remains unavailable unless its exact edition and input contract are selected. A live Tavily request still needs runtime credentials. Dryad's README still disagrees with the actual table archive contents.
+**Owner:** Luis. **Integration owner:** Esteban. **Current status:** deterministic rule tools and focused tests are implemented; 225 workbook-derived UZH records have been extracted, but their phenotype role is unverified and they are blocked from use as evaluation ground truth. The Oct 2024 Dryad archive's per-isolate DOCX tables supply numeric reference measurements for EA/MAE; the missing advertised CSV does not block that path. M100-Ed36 candidate data includes five draft intrinsic-resistance checks and eight draft ESBL disk-screen criteria from the PDF the project owner supplied and said is authorized. The Ed36 catalog remains unavailable until its reviewer record and P1 input/edition gate are complete. A real Tavily INS/OPS smoke check is recorded in the team plan; provider keys remain in local runtime secrets.
 
 ## Scope assigned by the team
 
@@ -55,9 +55,9 @@ Implemented in `src/bacterioscope/integrations/tavily.py` as `TavilyAlertSearch.
 - Queries are fixed public AMR-alert queries. No isolate, patient, or AST result is sent to Tavily.
 - The request asks for news search, disables Tavily-generated answers/raw page content, and restricts domains server-side.
 - Returned URLs are checked again against the selected HTTPS domain. Results contain title, URL, snippet, source, and publication date; returned page text is untrusted context, not AST or rule evidence.
-- The key comes only from server-side `TAVILY_API_KEY`. Missing keys and request failures raise typed errors without logging or returning the key.
+- The key comes only from server-side `TAVILY_API_KEY`. Missing keys and request failures raise typed errors without logging or returning the key. A private live smoke check for both sources is documented in `docs/TEAM_EXECUTION_PLAN.md` (2026-10-11); ordinary tests continue to mock HTTP.
 
-Esteban can call the class through his tool-calling layer and serialize `PublicAlert` fields. The module uses Python's standard library; no new runtime dependency is required. The live request still needs an API key and a smoke test in a private environment.
+Esteban can call the class through his tool-calling layer and serialize `PublicAlert` fields. The module uses Python's standard library; no new runtime dependency is required. Do not commit the API key or copy it into this document.
 
 ## P2-3: UZH/Dryad phenotype indicators and provenance
 
@@ -65,7 +65,7 @@ Implemented in `src/bacterioscope/phenotypes/uzh.py` and `scripts/extract_uzh_ph
 
 The extractor accepts Dryad's documented `SampleID`/`ResistanceMechanism` CSV or the overview workbook found in the uploaded archive. It preserves raw labels, normalizes only declared labels, records unknown statuses, and keeps EUCAST provenance. `Combination` remains unspecified when it appears in the CSV. The workbook is named `Overview GPT JCM.xlsx` and contains yes/no indicators for `None`, `ESBL`, `AMPC`, and `CARBAPENEMASE`; only explicit `yes` values are retained as `source_reported_codes`. Its role is not documented. The paper reports routine-diagnostic reference counts of None=75, ESBL=111, AmpC=32, carbapenemase=23, while workbook counts are None=76, ESBL=113, AmpC=33, carbapenemase=23. This, together with “GPT” in the filename, suggests a possible model-output summary but does not prove it. Therefore workbook rows have `label_provenance_status=unverified_workbook_summary` and an empty `reference_label_codes`; Daniel must not score them as ground truth until Dryad or the authors confirm their meaning. Documented CSV rows are separately marked `documented_measurement_table`. For workbook rows, `sample_id` preserves the source `Image` identifier, `source_identifier_type` says it is an image ID, and `image_join_key` trims only the final period for joining to the image archive. Output is `data/processed/uzh_phenotype_labels.csv` and records source DOI, license declaration, source asset/author, SHA-256, organism, and EUCAST provenance.
 
-Dryad lists 225 Gram-negative isolates, 862 valid phenotypic categories, and a `Tables.zip` containing `Tables/measurements.csv`. The uploaded full archive is at `data/raw/dryad_uzh/doi_10_5061_dryad_5dv41nsfj__v20241013.zip`; its nested `Tables.zip` is `data/raw/dryad_uzh/Tables.zip`, SHA-256 `ffeb440d482be894d582efaf5b3417b6f003ce3119a43c3bb1a1bedec2b532d7`. The archive has 450 DOCX files and one actual XLSX workbook (plus an AppleDouble metadata stub), but no CSV. The workbook has 225 unique image IDs, species, and mechanism indicators. Its image IDs join one-to-one to the 225 original image names after trimming a trailing period (223 matched exactly before this punctuation normalization). Paper reference counts differ from the workbook counts, so these rows remain unverified source summaries. Dryad's README says EUCAST 2022 while the paper cites breakpoint-table version 13.1 (2023); preserve this discrepancy until reconciled.
+This work is pinned to Dryad archive version `v20241013` (2024-10-13); no January 2026 dataset is used. Dryad lists 225 Gram-negative isolates, 862 valid phenotypic categories, and a `Tables.zip` containing `Tables/measurements.csv`. The downloaded outer archive is `data/raw/dryad_uzh/doi_10_5061_dryad_5dv41nsfj__v20241013.zip`; its extracted `Tables.zip` is `data/raw/dryad_uzh/Tables.zip`, SHA-256 `ffeb440d482be894d582efaf5b3417b6f003ce3119a43c3bb1a1beddec2b532d7`. That ZIP has 225 per-isolate DOCX measurement tables, 225 macOS metadata sidecars, and one actual XLSX workbook (plus an AppleDouble metadata stub), but no CSV. `scripts/prepare_dataset.py` reads the DOCX measurement tables and generates numeric ground truth for the EA/MAE workflow; request the missing CSV from Dryad only to reconcile the advertised package, not as a prerequisite for those metrics. The workbook has 225 unique image IDs, species, and mechanism indicators. Its image IDs join one-to-one to the 225 original image names after trimming a trailing period (223 matched exactly before this punctuation normalization). Paper reference counts differ from the workbook counts, so these remain unverified phenotype summaries. Dryad's README says EUCAST 2022 while the paper cites breakpoint-table version 13.1 (2023); preserve this discrepancy until reconciled.
 
 ```powershell
 python scripts/extract_uzh_phenotypes.py --input data/raw/dryad_uzh/Tables.zip
@@ -115,15 +115,17 @@ drug, or standard:
    microbiologist reviews each organism/drug mapping and P1 confirms the
    pipeline edition. The default remains Ed33 and its catalog stays empty.
    Never mix Ed33 classifications with Ed36 rule findings.
-4. **Resolve UZH label provenance.** The current workbook is an unverified
-   summary: its title and counts do not match the paper's routine-diagnostic
-   reference counts. Ask Dryad/the authors what it represents and obtain
-   `measurements.csv` if it was omitted. Until then, use the workbook only for
-   source-ingestion/image-join demos, not as an evaluation target.
-5. **Smoke-test Tavily privately.** Once `TAVILY_API_KEY` is configured in the
-   runtime secrets, test the fixed INS and OPS queries. The report shows source,
-   URL, and retrieval/publication date; search failure or no eligible result is
-   an explicit unavailable state. No plate image, isolate identifier, or AST
+4. **Resolve UZH phenotype-label provenance.** The current workbook is an
+   unverified summary: its title and counts do not match the paper's
+   routine-diagnostic reference counts. Ask Dryad/the authors what it
+   represents and keep it out of phenotype evaluation until clarified. Numeric
+   measurement evaluation uses the v20241013 per-isolate DOCX tables, not the
+   workbook. Request the advertised `measurements.csv` only to reconcile the
+   package contents.
+5. **Keep Tavily credentials private.** A live smoke check of the fixed INS
+   and OPS queries is recorded in the team plan. The report shows source, URL,
+   and retrieval/publication date; search failure or no eligible result is an
+   explicit unavailable state. No plate image, isolate identifier, or AST
    vector goes to Tavily.
 6. **Integrate and render.** Esteban assembles pipeline results, the AST/zone
    rule outputs, and optional alerts into his final validated JSON report.
@@ -157,8 +159,9 @@ Dryad Tables.zip -> P2 UZH extractor -> provenance-rich phenotype CSV -> P3 eval
 - The UZH extractor preserves raw workbook indicators and unknown values,
   marks the workbook provenance unverified, and leaves its reference-label
   field empty. A documented CSV or author confirmation is required before
-  evaluation use; source DOI, asset, author, hash, image key, and EUCAST
-  version discrepancy remain traceable.
+  evaluating those phenotype indicators; numeric zone EA/MAE uses the
+  version-pinned DOCX measurement tables. Source DOI, asset, author, hash,
+  image key, and EUCAST version discrepancy remain traceable.
 - Tavily has a private live smoke check for both allowlisted sources, while
   unit tests continue to mock HTTP and verify failure handling.
 - P1, P3, and P4 consume the same documented fields; no team member duplicates
@@ -168,6 +171,6 @@ Dryad Tables.zip -> P2 UZH extractor -> provenance-rich phenotype CSV -> P3 eval
 
 - Confirm with Esteban whether the integrated pipeline remains on Ed33 or will move to a licensed, reviewed edition. Do not mix editions.
 - Obtain qualified microbiology review for each Ed36 candidate rule; have the project owner retain the authorization record and confirm its scope for public distribution.
-- Configure `TAVILY_API_KEY` privately and run a live smoke check for INS and OPS.
-- Resolve with Dryad whether `Overview GPT JCM.xlsx` contains model outputs or routine-diagnostic labels, and obtain `measurements.csv` if it was omitted. Until then, workbook values are not an evaluation reference. Reconcile the EUCAST edition note against the README and paper.
+- Keep `TAVILY_API_KEY` in a private runtime secret. A live INS/OPS smoke check is recorded in the team plan.
+- Resolve with Dryad whether `Overview GPT JCM.xlsx` contains model outputs or routine-diagnostic labels. Do not use those workbook phenotype values as evaluation reference until clarified. The missing advertised `measurements.csv` does not block zone-diameter EA/MAE, which uses the v20241013 DOCX tables. Reconcile the EUCAST edition note against the README and paper.
 - Esteban integrates the three rule entry points and Tavily result fields into the agent tool-call schema; no response-schema changes are made by Luis in this task.
