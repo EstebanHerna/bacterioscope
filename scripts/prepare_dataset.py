@@ -102,8 +102,14 @@ def _parse_args() -> argparse.Namespace:
 def _find_images(data_dir: Path) -> dict[str, Path]:
     images: dict[str, Path] = {}
     for path in data_dir.rglob("*"):
-        if path.suffix.lower() in _IMAGE_SUFFIXES:
-            images[path.stem] = path
+        if (
+            not path.is_file()
+            or path.suffix.lower() not in _IMAGE_SUFFIXES
+            or path.name.startswith("._")
+            or "__MACOSX" in path.parts
+        ):
+            continue
+        images[path.stem] = path
     return images
 
 
@@ -205,7 +211,14 @@ def _match_image(isolate_id: str, images: dict[str, Path]) -> Path | None:
     exact = images.get(isolate_id)
     if exact is not None:
         return exact
-    candidates = [v for k, v in images.items() if isolate_id in k]
+    normalized_id = isolate_id.rstrip(".")
+    candidates = [
+        path
+        for stem, path in images.items()
+        if stem == normalized_id
+        or stem.startswith(f"{normalized_id} ")
+        or stem.startswith(f"{normalized_id}. ")
+    ]
     if not candidates:
         return None
     original = [c for c in candidates if "original" in c.stem.lower()]

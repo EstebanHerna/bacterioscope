@@ -15,7 +15,7 @@
 - Generated artifact: `data/processed/uzh_phenotype_labels.csv` (ignored/generated data; regenerate locally).
 
 The current Dryad record describes `Tables/measurements.csv`, but the supplied
-2.97 MB `Tables.zip` has no CSV. It contains 450 DOCX files, one actual XLSX
+2.97 MB `Tables.zip` has no CSV. It contains 225 DOCX files, 225 macOS metadata sidecars, one actual XLSX
 workbook, and an AppleDouble metadata stub for that workbook. The XLSX is named
 `Overview GPT JCM.xlsx` and has 225 image IDs, species, and binary/unknown
 indicator cells. The package/README mismatch remains open.
@@ -31,6 +31,30 @@ extractor stores its values as `source_reported_codes`, leaves
 `unverified_workbook_summary`. Daniel must not use it as evaluation ground
 truth. The documented measurements CSV, if obtained and verified, follows a
 different path and is labeled `documented_measurement_table`.
+
+**Measurement ground truth is a separate asset path.** This project is pinned
+to the Dryad archive version `v20241013` (2024-10-13); no January 2026 dataset
+is used. The 225 per-isolate DOCX tables contain the numeric SIRscan zone
+measurements. `scripts/prepare_dataset.py` parses those DOCX files and writes
+the ignored `data/processed/ground_truth.csv` consumed by
+`scripts/validate_measurement.py`. Therefore the missing advertised CSV does
+not block the existing zone-diameter EA/MAE workflow. Ask the authors for that
+CSV only to reconcile the public package description, or to compare the
+formats. Do not substitute the unverified workbook phenotype flags for these
+numeric measurements.
+
+On 2026-10-11, the existing parser regenerated 3,597 numeric reference rows
+from all 225 source DOCX tables in `data/processed/ground_truth.csv`. The output covers all 225 source-image IDs. The 20 identity-annotation files
+contain 317 antibiotic-code rows, all found in the corresponding source
+tables. Re-running the measurement pipeline on those 20 annotated photos
+reproduced **32.9% identity-matched EA, 6.28 mm MAE, and r=0.193 across 316
+detected pairs**. The detector missed one annotated disk; therefore 317
+available reference mappings yielded 316 measured pairs. This reproduces the
+existing report's identity-matched result and is not a CLSI S/I/R validation.
+The documented 80-image run also reproduced 59/80 matching disk counts,
+944 rank-order pairs (38.1% EA, 3.93 mm MAE), and the same 20-image
+identity-matched result. Rank-order metrics remain an optimistic comparison,
+not the project's accuracy claim.
 
 Primary sources: [Dryad dataset record](https://datadryad.org/dataset/doi:10.5061/dryad.5dv41nsfj)
 and the [J Clin Microbiol article](https://doi.org/10.1128/jcm.00689-24).
@@ -67,12 +91,29 @@ to negative labels.
 - Do not train or claim a clinical classifier from these labels without a
   documented label definition, source clarification, and appropriate review.
 - Ask Dryad/the authors to confirm whether the workbook represents GPT output,
-  reference annotations, or a different summary, and request the documented
-  `measurements.csv` if it is missing from the deposited archive.
+  reference annotations, or a different summary. Request the documented
+  `measurements.csv` to reconcile the missing public asset if useful; its
+  absence does not block the numeric zone-measurement ground truth available
+  from the DOCX tables.
 
 ## Reproduction
 
 From the repository root in PowerShell:
+
+```powershell
+$env:PYTHONPATH = (Join-Path (Get-Location).Path 'src')
+python -m pip install -e '.[dev]'
+python scripts/download_data.py
+python scripts/prepare_dataset.py --data-dir data/raw/dryad_uzh
+python scripts/validate_measurement.py --subset 80 --max-annotated 1
+```
+
+`scripts/download_data.py` finds the pinned `v20241013` ZIP whether it is in
+`data/raw/` or `data/raw/dryad_uzh/`, resumes partial extraction, and does not
+re-extract the outer archive as an inner ZIP. The commands above generate the
+ignored `data/processed/ground_truth.csv` from the DOCX tables.
+
+To regenerate only the phenotype-indicator export:
 
 ```powershell
 $env:PYTHONPATH = (Join-Path (Get-Location).Path 'src')

@@ -8,13 +8,13 @@ Build **BacterioScope Lab Review Assistant**, a hackathon research/demo workflow
 
 ## Current snapshot
 
-- Repository: `EstebanHerna/bacterioscope`; branch `feat/rules`; base commit `a10efd1`.
+- Repository: `EstebanHerna/bacterioscope`; branch `feat/rules`; base commit `d857fe3`.
 - Existing system: Streamlit, FastAPI `/analyze`, CLI, image pipeline, HTML/JSON reports, CLSI M100-Ed33 (2023) classifier, traceability, and CI.
 - Documented limits: label OCR is not usable; identity/panel selection remains manual; real-photo identity-matched EA is 32.9% on a 20-image subset; S/I/R agreement against a CLSI-compatible reference is not validated.
 - UZH/Dryad provides EUCAST-provenance data, but the deposited `Overview GPT JCM.xlsx` is an unverified summary whose role may be model output. It must not be treated as evaluation ground truth until Dryad/the authors confirm it. The repository also records EUCAST 2022 in the README and breakpoint-table v13.1 (2023) in the paper; do not silently resolve this.
 - New Persona 2 code: three deterministic AST rule-tool entry points, a separate zone-based ESBL screen tool, an empty Ed33 JSON catalog, and Ed36 draft catalogs with five intrinsic-resistance checks and eight disk-screen criteria. The Ed36 rules are unavailable by default; the project owner supplied the source PDF and attested authorization. Esteban still owns the pipeline edition and integration contract. Also includes a fixed-query Tavily client for `ins.gov.co` and `paho.org`, UZH CSV/workbook label extraction with source metadata, and focused tests per tool.
-- No clinical rule content is enabled. The Ed36 candidate catalog is not a usable clinical rule set until reviewed. The Tavily request has only been tested with mocked HTTP; live key is not configured.
-- The full Dryad archive and nested `Tables.zip` are present under `data/raw/dryad_uzh/`. Dryad's record says the ZIP contains `measurements.csv`, but the downloaded ZIP has 450 DOCX files and one actual XLSX workbook with 225 image IDs/species/phenotype indicators. The workbook is named `Overview GPT JCM.xlsx`; its mechanism counts differ from the paper's reference counts. The extractor now preserves those values as unverified `source_reported_codes` and leaves `reference_label_codes` empty. It writes `data/processed/uzh_phenotype_labels.csv`, but workbook values are not valid evaluation targets until the source role is clarified.
+- No clinical rule content is enabled. The owner reports that clinical review is complete, but traceable reviewer identity/qualification, review date, and exact candidate scope were not supplied; the Ed36 catalog therefore remains fail-closed. A live Tavily smoke check against INS and OPS is recorded below and in `docs/TEAM_EXECUTION_PLAN.md`; provider keys remain outside the repo.
+- This work is pinned to Dryad archive version `v20241013` (2024-10-13); no January 2026 dataset is used. The local raw archive is fully extracted. Its `Tables.zip` has 225 per-isolate DOCX measurement tables plus 225 macOS metadata sidecars and the `Overview GPT JCM.xlsx` workbook, but no `measurements.csv`. `prepare_dataset.py` parses the DOCX tables and has regenerated the ignored `data/processed/ground_truth.csv` with 3,597 numeric rows for EA/MAE. The workbook's phenotype indicators differ from the paper's reference counts, so the extractor preserves them as unverified `source_reported_codes` and leaves `reference_label_codes` empty. `scripts/download_data.py` now detects incomplete outer and nested extraction rather than treating an existing ZIP as proof of completion.
 - Persona owners: Esteban P1 agent/integration, Luis P2 clinical tools/sources, Daniel P3 evaluation/Nebius, Sebastian P4 product/delivery.
 - Previous geometry-only education examples remain draft artifacts and are not the current P2 work package or primary product route.
 
@@ -54,13 +54,16 @@ See `UZH_LABEL_AUDIT.md` for extracted workbook counts, provenance, limits, and 
 - [x] Marked the old `tests/agent_harness/` fixtures as education-only and not an AST/CLSI benchmark; the lab-review contract harness remains pending Esteban's schema.
 - [x] Ran repository CI-style static checks and the complete test suite locally: Ruff, Bandit, and mypy passed; 313 tests passed with 92.25% coverage. `pip-audit` did not return within the local check window, so its result remains unconfirmed until CI.
 - [x] Renamed the local work branch to `feat/rules`.
+- [x] Fast-forwarded the P2 branch to current `main` and fixed resumable Dryad ZIP extraction, with focused coverage for partial outer/nested archives.
+- [x] Reproduced measurement ground truth and EA/MAE from only the Oct 2024 archive's per-isolate DOCX tables; the identity-matched result is 32.9% EA, 6.28 mm MAE, 316 pairs across 20 annotated images. The missing advertised CSV is not required for these metrics; the phenotype workbook remains excluded as reference truth.
+- [x] Filtered AppleDouble image sidecars and fixed punctuation-tolerant isolate/image matching so the pinned archive yields all 3,597 plausible reference rows across 225 images.
 
 ### Blockers / follow-up
 
 - [ ] Esteban replaces/extends the earlier education-only report schema, maps pipeline output to `ASTObservation`, passes quality flags and the ESBL zone/assay fields, and confirms the standard edition the agent pipeline will use.
 - [ ] Keep Ed36 rule catalogs unavailable until the pipeline is explicitly on Ed36 and catalog activation is approved under the team's intended-use policy. The project owner should retain the authorization record and confirm its scope for public distribution.
-- [ ] Configure Tavily API key privately and run live INS/OPS smoke checks.
-- [ ] Ask Dryad/the authors to clarify whether `Overview GPT JCM.xlsx` contains model outputs, routine-diagnostic labels, or another summary, and provide the documented `measurements.csv` if omitted. Until then, exclude workbook values from evaluation; reconcile EUCAST edition from README/paper.
+- [ ] Keep the user's Tavily key in a private runtime secret; it is not present in this Codex process. The team already recorded a real INS/OPS smoke check on 2026-10-11.
+- [ ] Ask Dryad/the authors to clarify whether `Overview GPT JCM.xlsx` contains model outputs, routine-diagnostic labels, or another summary. Request the advertised `measurements.csv` only to reconcile package contents; zone EA/MAE uses the v20241013 DOCX tables. Continue excluding workbook phenotype values from evaluation and reconcile EUCAST edition from README/paper.
 - [ ] Daniel builds the job and reports requested metrics only when the reference standard is compatible; otherwise mark CLSI categorical metrics unavailable.
 - [ ] Sebastian integrates the visible “rule catalog unavailable” state and public alert citations after Esteban freezes the report contract.
 
@@ -78,6 +81,7 @@ Esteban should freeze the agent input/output fields and confirm the target CLSI 
 | 2026-10-08 | Added a draft Ed36 ESBL screening catalog with eight zone thresholds and a typed evaluator requiring exact assay context and disk identity. Added synthetic boundary, threshold transcription, incomplete-context, quality, potency, duplicate, edition, and fail-closed tests. | Focused P2 suite: 40 passed. Await Esteban's edition and input-contract decision before integration. |
 | 2026-10-08 | Rechecked UZH workbook semantics against the Dryad record and JCM paper. Filename and count discrepancies mean `Overview GPT JCM.xlsx` cannot be treated as reference labels yet; extractor now stores its labels separately and leaves reference codes empty. | Re-extracted all 225 rows; workbook provenance is unverified and reference-code fields are empty. Focused P2 suite: 40 passed. Ask Dryad/authors to clarify the workbook and missing CSV before Daniel evaluates against it. |
 | 2026-10-09 | Clarified that the retained education fixtures are not the lab-review AST evaluation harness. Fixed Ruff, Bandit, and mypy findings in Persona 2 code and reran the repository checks. | Ruff, Bandit, mypy passed; 313 tests passed at 92.25% coverage. Local `pip-audit` did not return; verify its CI result. |
+| 2026-10-11 | Fixed recursive Dryad archive discovery and resumable extraction; excluded the outer archive from nested extraction; ignored macOS sidecars and normalized isolate/image punctuation. Rebuilt ground truth and reran the documented 80-image measurement evaluation using only archive `v20241013`. | 3,597 numeric references across 225 images; 46 focused P2/data-prep tests passed; Ruff passed. Reproduced 32.9% identity-matched EA, 6.28 mm MAE, r=0.193 (316 pairs), and 38.1% rank-order EA / 3.93 mm MAE (944 pairs). |
 
 ## Resume checklist
 

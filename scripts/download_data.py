@@ -60,7 +60,7 @@ _DATASETS: dict[str, dict[str, object]] = {
 
 def _find_zip(globs: list[str]) -> Path | None:
     for pattern in globs:
-        matches = sorted(DATA_DIR.glob(pattern))
+        matches = sorted(DATA_DIR.rglob(pattern))
         if matches:
             return matches[0]
     return None
@@ -90,10 +90,29 @@ def _safe_extract(zip_path: Path, dest_dir: Path) -> None:
     print(f"    Extracted {zip_path.name} -> {dest_dir}")
 
 
-def _extract_nested(outer_dest: Path) -> None:
+def _archive_is_fully_extracted(zip_path: Path, dest_dir: Path) -> bool:
+    """Return whether every archive member exists with its expected size."""
+    dest_resolved = dest_dir.resolve()
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        for entry in zf.infolist():
+            target = (dest_dir / entry.filename).resolve()
+            if not target.is_relative_to(dest_resolved):
+                return False
+            if entry.is_dir():
+                if not target.is_dir():
+                    return False
+            elif not target.is_file() or target.stat().st_size != entry.file_size:
+                return False
+    return True
+
+
+def _extract_nested(outer_dest: Path, *, exclude: Path | None = None) -> None:
+    excluded_path = exclude.resolve() if exclude is not None else None
     for inner_zip in sorted(outer_dest.glob("*.zip")):
+        if excluded_path is not None and inner_zip.resolve() == excluded_path:
+            continue
         sub_dir = outer_dest / inner_zip.stem
-        if sub_dir.exists():
+        if _archive_is_fully_extracted(inner_zip, sub_dir):
             print(f"    Already extracted: {inner_zip.name}")
             continue
         sub_dir.mkdir(parents=True, exist_ok=True)
@@ -129,12 +148,9 @@ def main() -> None:
 
         print(f"  ZIP found: {zip_path.name} ({zip_path.stat().st_size // 1_048_576} MB)")
 
-        sentinels = (
-            list(dest_dir.glob("README*"))
-            + list(dest_dir.glob("*.zip"))
-            + list(dest_dir.glob("data.yaml"))
+        already_done = dest_dir.exists() and _archive_is_fully_extracted(
+            zip_path, dest_dir
         )
-        already_done = dest_dir.exists() and bool(sentinels)
         if already_done:
             print(f"  Already extracted to {dest_dir} — skipping.")
         else:
@@ -144,7 +160,7 @@ def main() -> None:
 
         if info["nested_zips"]:
             print("  Extracting nested ZIPs...")
-            _extract_nested(dest_dir)
+            _extract_nested(dest_dir, exclude=zip_path)
 
     print("\nDone. Check data/raw/ for extracted datasets.")
     print("Next step: python scripts/prepare_dataset.py")
