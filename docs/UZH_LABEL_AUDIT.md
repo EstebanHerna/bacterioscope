@@ -87,4 +87,5 @@ python -m pytest --basetemp .pytest-run-uzh -o addopts= tests/test_expert_rules.
 ```
 
 Result on 2026-10-08 before the ESBL screen and provenance correction: 18 passed. A live Tavily request was not part of this
-test; HTTP behavior is mocked until a private runtime key is configured.
+test; HTTP behavior was mocked at that time. A live key was configured and the request was run for real on
+2026-10-11 -- see docs/TEAM_EXECUTION_PLAN.md's current work package state for the result.
