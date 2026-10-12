@@ -59,26 +59,26 @@ See `UZH_LABEL_AUDIT.md` for extracted workbook counts, provenance, limits, and 
 - [x] Filtered AppleDouble image sidecars and fixed punctuation-tolerant isolate/image matching so the pinned archive yields all 3,597 plausible reference rows across 225 images.
 - [x] Reviewed Esteban's merged agent orchestration (`e50c591`): it calls the three expert-rule tools and accepts optional alert results, but had not wired ESBL evaluation or a rule-edition field separate from measurement edition.
 
-### Current integration hardening (branch `feat/p2-integration-hardening`, not yet merged)
+### Integration hardening in PR #5 (`feat/p2-integration-hardening`)
 
 - Separate `rule_standard` from `measurement.standard` in the report and allow the caller to opt into a distinct rule edition.
 - Invoke the ESBL evaluator only when the caller supplies an explicit ESBL edition and typed assay/disk inputs; the draft Ed36 catalog still returns unavailable.
 - Exclude any disk with a pipeline quality flag from the expert-rule observations, and preserve the exclusion reason in the report.
 - Let the report caller opt into fixed INS/OPS Tavily queries; report `available`, `no_results`, `partial`, or `unavailable` without stopping plate review.
-- Focused integration suite passed: **94 passed**; Ruff, compilation, schema parsing, and whitespace checks passed. Remote CI remains pending until a PR is opened.
+- Focused integration suite passed: **94 passed**; Ruff, compilation, schema parsing, and whitespace checks passed. CI and CodeQL passed on commit `33c2d3b`; rerun them if code changes.
 
 ### Blockers / follow-up
 
-- [x] Focused integration-hardening suite passed: **94 passed**; Ruff, Python compilation, JSON schema parsing, and `git diff --check` passed. CI is still pending. The caller/UI must provide the chosen rule edition and, for ESBL, exact disk identity/potency, zone, quality acceptance, and assay context.
+- [x] Focused integration-hardening suite passed: **94 passed**; Ruff, Python compilation, JSON schema parsing, and `git diff --check` passed. CI and CodeQL passed on commit `33c2d3b`. The caller/UI must provide the chosen rule edition and, for ESBL, exact disk identity/potency, zone, quality acceptance, and assay context.
 - [ ] Keep Ed36 rules unavailable until a named qualified reviewer, review date, and exact candidate scope are recorded. Owner permission to use a source is separate from clinical review and does not fill those fields.
 - [ ] Put `TAVILY_API_KEY` in the hosted server-side secret store and have the UI opt into INS/OPS search. The real INS/OPS smoke check already passed on 2026-10-11.
 - [ ] Ask Dryad/the authors to clarify whether `Overview GPT JCM.xlsx` contains model outputs, routine-diagnostic labels, or another summary. Request the advertised `measurements.csv` only to reconcile package contents; zone EA/MAE uses the v20241013 DOCX tables. Continue excluding workbook phenotype values from evaluation and reconcile EUCAST edition from README/paper.
 - [ ] Daniel builds the job and reports requested metrics only when the reference standard is compatible; otherwise mark CLSI categorical metrics unavailable.
-- [ ] Sebastian integrates the visible “rule catalog unavailable” state and public alert citations after Esteban freezes the report contract.
+- [ ] Sebastian integrates the visible “rule catalog unavailable” state and public alert citations against the current report contract.
 
 ## Next concrete action
 
-Publish `feat/p2-integration-hardening` and inspect CI before merging. P4 must call the report path with the selected rule edition, any optional ESBL inputs, and server-side Tavily search, then display the resulting states. Keep clinical catalogs unavailable until the correct-edition source and traceable qualified review are recorded. Daniel should continue excluding workbook phenotype indicators from reference metrics until Dryad/the authors clarify their meaning.
+After PR #5 merges, P4 must call the report path with the selected rule edition, any optional ESBL inputs, and server-side Tavily search, then display the resulting states. Keep clinical catalogs unavailable until the correct-edition source and traceable qualified review are recorded. Daniel should continue excluding workbook phenotype indicators from reference metrics until Dryad/the authors clarify their meaning.
 
 ## Change log
 
