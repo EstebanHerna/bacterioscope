@@ -35,8 +35,8 @@ class ASTObservation:
     def __post_init__(self) -> None:
         if not self.antibiotic_code.strip():
             raise ValueError("antibiotic_code must not be empty")
-        if self.category.strip().upper() not in {"S", "I", "R"}:
-            raise ValueError("category must be S, I, or R")
+        if self.category.strip().upper() not in {"S", "SDD", "I", "R"}:
+            raise ValueError("category must be S, SDD, I, or R")
 
     @property
     def normalized_code(self) -> str:
@@ -58,8 +58,8 @@ class RuleCondition:
         if not self.antibiotic_code.strip():
             raise ValueError("condition antibiotic_code must not be empty")
         normalized = {category.strip().upper() for category in self.categories}
-        if not normalized or not normalized <= {"S", "I", "R"}:
-            raise ValueError("condition categories must contain S, I, and/or R")
+        if not normalized or not normalized <= {"S", "SDD", "I", "R"}:
+            raise ValueError("condition categories must contain S, SDD, I, and/or R")
 
 
 @dataclass(frozen=True)

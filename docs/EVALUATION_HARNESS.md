@@ -45,6 +45,8 @@ Report sample counts, exact source and version, organism/drug coverage, exclusio
 
 - Measurement agreement may use identity-matched UZH/SIRscan zone diameters from the per-isolate DOCX tables with source/license provenance and an explicit note that the images were captured in a controlled SIRscan workflow.
 - Do not calculate or describe CLSI CA, VME, ME, or mE using UZH categories unless the predictions and reference categories share the same compatible CLSI edition and criteria. Existing UZH labels have EUCAST provenance; current classifier code is CLSI Ed33.
+- The Ed33 sidecar generator applies the configured classifier to UZH/SIRscan reference diameters; it preserves EUCAST labels and excludes incompatible disk contents and unsupported organisms. These categories derive from the same classifier and therefore are not an independent benchmark or clinical truth. Preserve `SDD`; see `docs/CLSI_ED33_GROUND_TRUTH_AUDIT.md`.
+- Current categorical agreement/error metrics and 3×3 confusion matrix accept only S/I/R and now reject SDD explicitly; Daniel must define a four-category treatment before reporting metrics for SDD-bearing data.
 - If a compatible CLSI reference is unavailable, mark those requested clinical categorical metrics unavailable and report measurement agreement plus rule-tool/agent metrics instead.
 - Exclude the `Overview GPT JCM.xlsx` mechanism indicators from reference metrics until Dryad/the authors clarify whether they are model outputs, reference labels, or another summary. Its counts differ from the paper's routine-diagnostic counts. Any later mechanism-label analysis must use a verified source table and remain EUCAST-provenance analysis, not a CLSI validation.
 

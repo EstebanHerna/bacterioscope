@@ -199,6 +199,10 @@ class TestOverallAccuracy:
 
 
 class TestCollectMetrics:
+    def test_sdd_is_rejected_by_three_category_metrics(self) -> None:
+        with pytest.raises(ValueError, match="only support categories S, I, and R"):
+            collect_metrics(["SDD"], ["S"])
+
     def test_perfect_case_full_metrics(self) -> None:
         pred = ["S", "S", "R", "R", "I"]
         ref = ["S", "S", "R", "R", "I"]

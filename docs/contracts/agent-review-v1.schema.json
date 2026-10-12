@@ -50,7 +50,7 @@
             "properties": {
               "disk_index": {"type": "integer", "minimum": 0},
               "antibiotic_code": {"type": "string", "minLength": 1},
-              "category": {"enum": ["S", "I", "R", "UNKNOWN"]},
+              "category": {"enum": ["S", "SDD", "I", "R", "UNKNOWN"]},
               "zone_mm": {"type": "number", "minimum": 0, "maximum": 100},
               "quality_flags": {
                 "type": "array",

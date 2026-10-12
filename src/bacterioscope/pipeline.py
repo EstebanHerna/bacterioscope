@@ -223,7 +223,7 @@ class AnalysisResult:
         px_per_mm: Calibration factor — pixels per millimetre.
         disks: One ``DiskResult`` per detected disk.
         zones: One ``ZoneResult`` per disk — zone diameter in pixels and mm.
-        classifications: One ``SusceptibilityResult`` per disk — S/I/R category
+        classifications: One ``SusceptibilityResult`` per disk — S/SDD/I/R category
             and CLSI breakpoint thresholds.
         annotated_image: BGR copy of the input image with contours and labels
             drawn by ``draw_results()``.  ``None`` if annotation failed.
@@ -369,7 +369,7 @@ class BacterioScopePipeline:
         3. Detect the plate rim and compute the px/mm calibration ratio.
         4. Locate antibiotic disks (YOLOv8 or Hough fallback).
         5. Segment the inhibition zone for each disk and measure its diameter.
-        6. Classify each diameter against CLSI 2023 breakpoints (S/I/R).
+        6. Classify each diameter against CLSI 2023 breakpoints (S/SDD/I/R).
         7. Draw annotations on a copy of the image.
 
         Args:
@@ -378,7 +378,7 @@ class BacterioScopePipeline:
 
         Returns:
             ``AnalysisResult`` containing detected disks, zone measurements,
-            S/I/R classifications, and the annotated image.
+            S/SDD/I/R classifications, and the annotated image.
 
         Raises:
             FileNotFoundError: If ``image_path`` does not point to an

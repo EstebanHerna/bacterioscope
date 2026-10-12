@@ -33,6 +33,7 @@ from bacterioscope.segmentation.watershed import ZoneResult
 COLORS: dict[str, tuple[int, int, int]] = {
     "S": (80, 180, 70),          # muted green in BGR
     "I": (45, 150, 205),         # muted amber in BGR
+    "SDD": (170, 120, 80),       # muted blue in BGR
     "R": (60, 60, 185),          # muted red in BGR
     "UNKNOWN": (110, 110, 110),
 }

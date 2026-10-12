@@ -1,3 +1,7 @@
+import math
+
+import pytest
+
 from bacterioscope.classification.clsi import CLSIClassifier
 
 
@@ -47,3 +51,33 @@ class TestCLSIClassifier:
     def test_ciprofloxacin_resistant(self) -> None:
         result = self.classifier.classify("ciprofloxacin", 18.0)
         assert result.category == "R"
+
+    @pytest.mark.parametrize(
+        ("antibiotic", "diameter", "expected"),
+        [
+            ("gentamicin", 14, "R"), ("gentamicin", 15, "I"),
+            ("gentamicin", 17, "I"), ("gentamicin", 18, "S"),
+            ("amikacin", 16, "R"), ("amikacin", 17, "I"),
+            ("amikacin", 19, "I"), ("amikacin", 20, "S"),
+            ("cefepime", 18, "R"), ("cefepime", 19, "SDD"),
+            ("cefepime", 24, "SDD"), ("cefepime", 25, "S"),
+            ("piperacillin-tazobactam", 20, "R"),
+            ("piperacillin-tazobactam", 21, "SDD"),
+            ("piperacillin-tazobactam", 24, "SDD"),
+            ("piperacillin-tazobactam", 25, "S"),
+        ],
+    )
+    def test_ed33_audited_breakpoint_boundaries(
+        self, antibiotic: str, diameter: float, expected: str
+    ) -> None:
+        assert self.classifier.classify(antibiotic, diameter).category == expected
+
+    def test_whole_mm_rounding_preserves_original_measurement(self) -> None:
+        result = self.classifier.classify("cefepime", 24.6)
+
+        assert result.category == "S"
+        assert result.zone_diameter_mm == 24.6
+
+    @pytest.mark.parametrize("diameter", [-0.1, math.nan, math.inf, -math.inf])
+    def test_invalid_measurement_is_unknown(self, diameter: float) -> None:
+        assert self.classifier.classify("cefepime", diameter).category == "UNKNOWN"

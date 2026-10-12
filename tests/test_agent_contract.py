@@ -57,6 +57,13 @@ class TestNormalizeAstObservations:
         assert normalized.observations[0].antibiotic_code == "ciprofloxacin"
         assert normalized.observations[0].category == "S"
 
+    def test_sdd_category_survives_agent_contract(self) -> None:
+        result = _result([_cls("cefepime", 20.0, "SDD")])
+        normalized = normalize_ast_observations(result)
+
+        assert len(normalized.observations) == 1
+        assert normalized.observations[0].category == "SDD"
+
     def test_unknown_category_is_skipped_not_raised(self) -> None:
         result = _result([_cls("disk_0", 12.0, "UNKNOWN")])
         normalized = normalize_ast_observations(result)

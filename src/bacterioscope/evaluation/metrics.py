@@ -28,6 +28,17 @@ def _validate(a: NDArray[Any], b: NDArray[Any]) -> None:
         raise ValueError("Input arrays must not be empty.")
 
 
+def _validate_sir_categories(predicted: NDArray[Any], reference: NDArray[Any]) -> None:
+    allowed = set(CATEGORIES)
+    unsupported = (set(predicted.tolist()) | set(reference.tolist())) - allowed
+    if unsupported:
+        labels = ", ".join(sorted(str(value) for value in unsupported))
+        raise ValueError(
+            "S/I/R agreement metrics only support categories S, I, and R; "
+            f"unsupported category: {labels}."
+        )
+
+
 def categorical_agreement(
     predicted: Sequence[str],
     reference: Sequence[str],
@@ -52,6 +63,7 @@ def categorical_agreement(
     pred = np.asarray(predicted)
     ref = np.asarray(reference)
     _validate(pred, ref)
+    _validate_sir_categories(pred, ref)
     return float(np.mean(pred == ref))
 
 
@@ -94,6 +106,7 @@ def error_rates(
     pred = np.asarray(predicted)
     ref = np.asarray(reference)
     _validate(pred, ref)
+    _validate_sir_categories(pred, ref)
 
     n = len(pred)
     n_r = int(np.sum(ref == "R"))
@@ -221,6 +234,7 @@ def sir_confusion_matrix(
     pred = np.asarray(predicted)
     ref = np.asarray(reference)
     _validate(pred, ref)
+    _validate_sir_categories(pred, ref)
     return confusion_matrix(ref, pred, labels=list(CATEGORIES))
 
 
@@ -244,6 +258,7 @@ def per_class_metrics(
     pred = np.asarray(predicted)
     ref = np.asarray(reference)
     _validate(pred, ref)
+    _validate_sir_categories(pred, ref)
     p, r, f, s = precision_recall_fscore_support(
         reference,
         predicted,
@@ -280,6 +295,7 @@ def overall_accuracy(
     pred = np.asarray(predicted)
     ref = np.asarray(reference)
     _validate(pred, ref)
+    _validate_sir_categories(pred, ref)
     return float(accuracy_score(reference, predicted))
 
 

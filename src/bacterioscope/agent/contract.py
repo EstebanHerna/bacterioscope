@@ -64,7 +64,7 @@ def _exclusion_reason(
 def normalize_ast_observations(result: AnalysisResult) -> NormalizedObservations:
     """Map pipeline classifications into ASTObservation, skipping what the tools reject.
 
-    ASTObservation requires a resolved S/I/R category and rejects duplicate
+    ASTObservation requires a resolved S/SDD/I/R category and rejects duplicate
     antibiotic codes (``evaluate_expert_rules`` raises ``ValueError`` on
     either). Most real plates today still carry UNKNOWN disks -- no
     antibiotic has been assigned yet, by panel or manually (see app.py) --

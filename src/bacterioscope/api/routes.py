@@ -2,7 +2,7 @@
 
 This module exposes the analysis pipeline as an HTTP service so that any
 program — a mobile app, a laboratory information system, or another service —
-can submit a plate photograph and receive S/I/R classifications as JSON,
+can submit a plate photograph and receive S/SDD/I/R classifications as JSON,
 without needing to install Python locally.
 
 Endpoints
@@ -12,7 +12,7 @@ Endpoints
     that the service is running before sending images.
 ``POST /analyze``
     Accepts a multipart form upload with a JPEG, PNG, BMP, or TIFF image.
-    Returns the full analysis result (disk count, zone diameters, S/I/R
+    Returns the full analysis result (disk count, zone diameters, S/SDD/I/R
     categories) as JSON.
 
 Security
@@ -82,7 +82,7 @@ async def analyze(image: UploadFile = File(...)) -> AnalyzeResponse:
     """Analyze an antibiogram plate image.
 
     Accepts a multipart image upload (JPEG, PNG, BMP, TIFF).
-    Returns disk detection results, zone diameters, and CLSI S/I/R categories.
+    Returns disk detection results, zone diameters, and CLSI S/SDD/I/R categories.
 
     Raises:
         HTTPException 415: If the file content type is not a supported image format.

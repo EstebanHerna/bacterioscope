@@ -95,6 +95,13 @@ def test_each_tool_reports_empty_catalog_as_unavailable() -> None:
         assert result.catalog_status == "no_rules_configured"
 
 
+def test_ast_contract_accepts_sdd_as_distinct_category() -> None:
+    observation = ASTObservation("FEP", "sdd")
+    assert observation.normalized_category == "SDD"
+    with pytest.raises(ValueError, match="condition categories"):
+        RuleCondition("FEP", ("SDD", "UNKNOWN"))
+
+
 def test_intrinsic_rule_emits_review_finding_without_rewriting_sir() -> None:
     observations = [ASTObservation("TEST1", "R")]
     result = check_intrinsic_resistance(

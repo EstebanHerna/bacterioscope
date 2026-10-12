@@ -8,6 +8,7 @@ import pytest
 
 from bacterioscope.design.tokens import (
     CATEGORY_TOKENS,
+    category_color,
     contrast_ratio,
     css_variables,
     is_valid_hex,
@@ -16,6 +17,9 @@ from bacterioscope.design.tokens import (
 
 
 class TestPalette:
+    def test_sdd_uses_intermediate_palette_without_losing_label(self) -> None:
+        assert category_color("SDD", "dark") == palette("dark")["cat_intermediate"]
+
     def test_dark_and_light_have_same_keys(self) -> None:
         assert set(palette("dark").keys()) == set(palette("light").keys())
 

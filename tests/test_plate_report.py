@@ -9,7 +9,11 @@ import numpy as np
 
 from bacterioscope.classification.clsi import SusceptibilityResult
 from bacterioscope.detection.detector import DiskResult
-from bacterioscope.evaluation.plate_report import generate_plate_html, save_plate_report
+from bacterioscope.evaluation.plate_report import (
+    _category_cell,
+    generate_plate_html,
+    save_plate_report,
+)
 from bacterioscope.pipeline import AnalysisResult
 from bacterioscope.segmentation.watershed import ZoneResult
 
@@ -53,6 +57,9 @@ def _make_result(n: int = 2, include_image: bool = True) -> AnalysisResult:
 
 
 class TestGeneratePlateHtml:
+    def test_sdd_category_is_rendered_as_a_badge(self) -> None:
+        assert _category_cell("SDD") == '<td><span class="badge SDD">SDD</span></td>'
+
     def test_returns_string(self) -> None:
         html = generate_plate_html(_make_result())
         assert isinstance(html, str)

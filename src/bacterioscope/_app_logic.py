@@ -64,7 +64,7 @@ def reclassify_with_assignment(
             when antibiotic is unassigned, so the disk identity is not lost.
 
     Returns:
-        SusceptibilityResult with category S/I/R for a known antibiotic, or UNKNOWN
+    SusceptibilityResult with category S/SDD/I/R for a known antibiotic, or UNKNOWN
         with an empty breakpoints dict when no antibiotic has been assigned.
     """
     if not antibiotic or antibiotic == _UNASSIGNED:

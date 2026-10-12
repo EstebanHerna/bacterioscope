@@ -16,7 +16,7 @@ FastAPI uses these schemas to:
 Classes
 -------
 ``DiskAnalysisItem``
-    Result for one antibiotic disk: name, zone diameter, S/I/R category,
+    Result for one antibiotic disk: name, zone diameter, CLSI S/SDD/I/R category,
     and the CLSI thresholds used.
 ``AnalyzeResponse``
     Full response from ``POST /analyze``: calibration metadata plus a list
@@ -35,9 +35,9 @@ class DiskAnalysisItem(BaseModel):
 
     antibiotic: str = Field(description="Antibiotic name as detected or classified.")
     zone_diameter_mm: float = Field(ge=0.0, description="Inhibition zone diameter in mm.")
-    category: str = Field(description="S/I/R category per CLSI 2023 breakpoints.")
+    category: str = Field(description="S/SDD/I/R category per CLSI M100-Ed33 breakpoints.")
     breakpoints: dict[str, float] = Field(
-        description="CLSI 2023 S/I/R breakpoint thresholds used for classification."
+        description="CLSI M100-Ed33 breakpoint thresholds used for classification."
     )
 
 

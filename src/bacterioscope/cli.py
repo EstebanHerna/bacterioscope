@@ -61,7 +61,7 @@ def analyze(
         None, help="Save an HTML analysis report to this path"
     ),
 ) -> None:
-    """Analyze a Kirby-Bauer plate image and print an S/I/R results table.
+    """Analyze a Kirby-Bauer plate image and print an S/SDD/I/R results table.
 
     Runs the full BacterioScope pipeline in order:
     calibration -> disk detection -> zone segmentation -> CLSI classification.
