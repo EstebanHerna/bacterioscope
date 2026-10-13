@@ -157,7 +157,7 @@ class TestPanelManagerAssign:
         disks = [just_past_top, just_before_top]
         labels = pm.assign(disks, panel, (cx, cy))
         assert labels is not None
-        assert len(labels) == 2
+        assert labels[1] == "antibiotic_0"
 
     def test_angle_uses_atan2_not_euclidean(self) -> None:
         pm = PanelManager()

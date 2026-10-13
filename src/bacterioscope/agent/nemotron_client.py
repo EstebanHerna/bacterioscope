@@ -175,6 +175,10 @@ class TokenFactoryClient:
                 model=model,
                 messages=messages,
                 max_tokens=max_tokens,
+                # Nemotron 3 Nano spends a small max_tokens budget on its
+                # reasoning channel by default and can return no final text.
+                # This workflow only needs a concise, schema-bound summary.
+                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
                 timeout=self._timeout_seconds,
             )
         except _openai_error_types() as exc:
@@ -183,6 +187,13 @@ class TokenFactoryClient:
             raise TokenFactoryRequestError("Token Factory returned no choices")
         choice = response.choices[0]
         content = choice.message.content or ""
+        if not content.strip():
+            finish_reason = choice.finish_reason or "unknown"
+            raise TokenFactoryRequestError(
+                "Token Factory returned no final text "
+                f"(finish_reason={finish_reason}); verify model reasoning settings "
+                "or increase max_tokens"
+            )
         return ChatCompletionResult(
             tier=tier, model=model, content=content, finish_reason=choice.finish_reason
         )

@@ -67,14 +67,15 @@ def _make_base_plate() -> np.ndarray:
     cv2.circle(mask_plate, CENTER, PLATE_R, 255, -1)
     agar[mask_plate > 0] = lawn_color
 
-    # Inhibition zones: lighter halos with blurred edges
+    # Darker inhibition zones with blurred edges, matching ZoneSegmenter's
+    # THRESH_BINARY_INV polarity. Synthetic visual only; not validation data.
     for (cx, cy), (_, zr, _, _) in zip(POSITIONS, DISKS):
         zone = np.zeros((SIZE, SIZE), dtype=np.float32)
         cv2.circle(zone, (cx, cy), zr, 1.0, -1)
         zone = cv2.GaussianBlur(zone, (25, 25), 9)
         for c in range(3):
             agar[:, :, c] = np.clip(
-                agar[:, :, c].astype(np.float32) + zone * 28, 0, 255
+                agar[:, :, c].astype(np.float32) - zone * 28, 0, 255
             ).astype(np.uint8)
 
     # Subtle granular texture (simulates agar surface)

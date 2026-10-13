@@ -21,6 +21,7 @@ from bacterioscope.agent.nemotron_client import (
 @dataclass
 class _FakeMessage:
     content: str | None
+    reasoning: str | None = None
 
 
 @dataclass
@@ -133,19 +134,34 @@ class TestChat:
         assert fake.chat.completions.last_kwargs is not None
         assert fake.chat.completions.last_kwargs["model"] == "vendor/super"
 
+    def test_disables_reasoning_for_concise_report_requests(self) -> None:
+        fake = _FakeOpenAIClient(
+            _FakeChatResponse([_FakeChoice(_FakeMessage("hello"))]), models=[]
+        )
+        client = _client(client=fake)
+        client.chat("nano", [{"role": "user", "content": "hi"}])
+        assert fake.chat.completions.last_kwargs is not None
+        assert fake.chat.completions.last_kwargs["extra_body"] == {
+            "chat_template_kwargs": {"enable_thinking": False}
+        }
+
     def test_raises_request_error_on_empty_choices(self) -> None:
         fake = _FakeOpenAIClient(_FakeChatResponse([]), models=[])
         client = _client(client=fake)
         with pytest.raises(TokenFactoryRequestError, match="no choices"):
             client.chat("nano", [{"role": "user", "content": "hi"}])
 
-    def test_empty_content_becomes_empty_string_not_none(self) -> None:
+    def test_empty_final_content_raises_actionable_request_error(self) -> None:
         fake = _FakeOpenAIClient(
-            _FakeChatResponse([_FakeChoice(_FakeMessage(None))]), models=[]
+            _FakeChatResponse([
+                _FakeChoice(_FakeMessage(None, reasoning="private internal reasoning"), "length")
+            ]),
+            models=[],
         )
         client = _client(client=fake)
-        result = client.chat("nano", [{"role": "user", "content": "hi"}])
-        assert result.content == ""
+        with pytest.raises(TokenFactoryRequestError, match="finish_reason=length") as exc_info:
+            client.chat("nano", [{"role": "user", "content": "hi"}])
+        assert "private internal reasoning" not in str(exc_info.value)
 
 
 class TestListModels:
