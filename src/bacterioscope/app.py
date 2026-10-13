@@ -6,6 +6,8 @@ Run with:
 
 from __future__ import annotations
 
+import dataclasses
+import json
 import tempfile
 from pathlib import Path
 from typing import Any, NamedTuple, cast
@@ -179,6 +181,8 @@ def _sync_for_new_image(image_id: str) -> None:
         return
     st.session_state["bs_image_id"] = image_id
     st.session_state.pop("bs_result", None)
+    st.session_state.pop("bs_agent_report", None)
+    st.session_state.pop("bs_agent_report_signature", None)
     stale = [k for k in st.session_state
              if k.startswith("bs_antibiotic_") or k.startswith("bs_override_")]
     for k in stale:
@@ -310,6 +314,7 @@ def _flag_badges(disk_flags: list[str]) -> str:
         "low_circularity": "irregular",
         "small_zone": "small",
         "boundary": "edge",
+        "crop_boundary": "window edge",
         "overlap": "overlap",
     }
     return "".join(
@@ -501,8 +506,284 @@ def _show_results(
             _hough_table(result, effective, panel_labels)
         else:
             _results_table(result.classifications, result.flags or [])
+        if any("crop_boundary" in disk_flags for disk_flags in result.flags):
+            st.warning(
+                "`window edge` means the detected zone nearly fills the image "
+                "region the algorithm searched, so the measured contour may be "
+                "the search-window boundary rather than the halo. It does not "
+                "mean your uploaded photo is cropped. Switch to **Original** and "
+                "inspect whether the halo's outer edge is actually visible. "
+                "Flagged readings are excluded from expert-rule checks."
+            )
         if result.zones:
             _download_button(result, effective)
+
+
+_RULE_STANDARDS = ("CLSI M100-Ed33 2023", "CLSI M100-Ed36 2026")
+_KNOWN_ORGANISMS = (
+    "Escherichia coli",
+    "Klebsiella pneumoniae",
+    "Klebsiella oxytoca",
+    "Klebsiella variicola",
+    "Citrobacter freundii",
+    "Enterobacter cloacae complex",
+)
+
+
+def _manual_override_indices(result: AnalysisResult) -> list[int]:
+    """Return disks whose displayed zone override differs from the pipeline."""
+    changed: list[int] = []
+    for index, zone in enumerate(result.zones):
+        raw = st.session_state.get(_override_key(index), zone.diameter_mm)
+        try:
+            override = float(raw)
+        except (TypeError, ValueError):
+            continue
+        if abs(override - zone.diameter_mm) > 0.01:
+            changed.append(index)
+    return changed
+
+
+def _load_local_provider_environment() -> None:
+    """Load ignored local .env values for development; hosted secrets stay in env."""
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
+
+
+def _render_agent_report(report: dict[str, Any]) -> None:
+    """Render the validated report while keeping its clinical limits visible."""
+    if report.get("status") == "grounded_report":
+        st.success("The model response passed structural and allowed-evidence checks.")
+    else:
+        st.warning(
+            "Showing the deterministic fallback; the model did not produce a "
+            "validated response."
+        )
+    st.info(
+        "`grounded_report` does not validate the measurement or clinical interpretation. "
+        "This prototype requires human review and must not release results or guide treatment."
+    )
+
+    st.markdown("#### Explanation")
+    explanation = report.get("model_explanation")
+    st.write(explanation or report.get("fallback_reason") or "No explanation available.")
+
+    st.markdown("#### Standards and rule coverage")
+    left, right = st.columns(2)
+    measurement = report.get("measurement", {})
+    left.metric("Measurement / classification", measurement.get("standard", "Not specified"))
+    right.metric("Independent rule edition", report.get("rule_standard", "Not specified"))
+    for name, status in report.get("catalog_status", {}).items():
+        st.write(f"**{name.replace('_', ' ').capitalize()}:** {status}")
+    st.caption(
+        "An empty or draft catalog means coverage is unavailable; it does not mean "
+        "that no clinical rule applies."
+    )
+
+    observations = measurement.get("observations", [])
+    if observations:
+        st.markdown("#### Measurements supplied to the agent")
+        st.dataframe(observations, hide_index=True, width="stretch")
+
+    findings = report.get("rule_findings", [])
+    st.markdown("#### Deterministic findings")
+    if findings:
+        for index, finding in enumerate(findings):
+            st.write(
+                f"**{finding.get('rule_type')}: {finding.get('code')}** — "
+                f"{finding.get('phenotype_label') or 'no phenotype label'}"
+            )
+            st.caption(
+                f"{finding.get('citation', '')} · {finding.get('standard', '')}"
+            )
+            if finding.get("source_url"):
+                st.link_button("Open source", finding["source_url"], key=f"bs_rule_source_{index}")
+    else:
+        st.write("No executable findings were reported.")
+
+    suppressions = report.get("cascade_suppressions", [])
+    st.write(
+        "**Cascade suppressions:** "
+        f"{', '.join(suppressions) if suppressions else 'none'}"
+    )
+
+    st.markdown("#### ESBL screen")
+    esbl = report.get("esbl_screen")
+    if esbl is None:
+        st.write(
+            "Not evaluated: image analysis does not capture the method, medium, "
+            "incubation conditions, or disk potency required for this screen."
+        )
+    else:
+        st.write(
+            f"Estado: **{esbl.get('status')}** · catálogo: "
+            f"{esbl.get('catalog_status')} · señal: {esbl.get('screen_signal')}"
+        )
+
+    st.markdown("#### Public INS / PAHO alerts")
+    alert_status = report.get("alert_search_status", "not_requested")
+    st.caption(f"Search status: {alert_status}")
+    alerts = report.get("public_alerts", [])
+    if alerts:
+        for index, alert in enumerate(alerts):
+            st.link_button(
+                f"{alert.get('source', '').upper()}: {alert.get('title', 'Alerta pública')}",
+                alert["url"],
+                key=f"bs_alert_{index}",
+            )
+            st.caption(alert.get("snippet", ""))
+    elif alert_status == "not_requested":
+        st.write("Search was not requested.")
+    elif alert_status == "unavailable":
+        st.write("Search was unavailable; this does not rule out current alerts.")
+    elif alert_status == "no_results":
+        st.write(
+            "No eligible official results were returned; this does not rule out "
+            "current alerts."
+        )
+    else:
+        st.write("No eligible official alert links were returned.")
+
+    with st.expander("Trazabilidad e informe JSON"):
+        st.json(report.get("traceability", {}))
+        report_json = json.dumps(report, ensure_ascii=False, indent=2)
+        st.download_button(
+            "Descargar informe JSON",
+            report_json.encode("utf-8"),
+            file_name=f"bacterioscope-agent-{report.get('analysis_id', 'report')}.json",
+            mime="application/json",
+            key=f"bs_download_agent_{report.get('analysis_id', 'report')}",
+        )
+        st.json(report)
+
+
+def _agent_review_panel(
+    result: AnalysisResult,
+    effective: list[SusceptibilityResult],
+) -> None:
+    """Opt-in UI for running and reviewing the existing agent report contract."""
+    st.markdown("---")
+    st.subheader("Agent review report")
+    st.caption(
+        "Use only synthetic or non-identifiable samples. The image file is not sent. "
+        "With consent, Nebius receives the selected species and structured report "
+        "context, including measurements, quality flags, standards, and the image hash."
+    )
+
+    organism_choice = st.selectbox(
+        "Exact species (selected by the user; not identified automatically)",
+        options=("", *_KNOWN_ORGANISMS, "Other"),
+        format_func=lambda value: "Select a species" if value == "" else value,
+        key="bs_agent_organism_choice",
+    )
+    organism = organism_choice
+    if organism_choice == "Other":
+        organism = st.text_input(
+            "Enter the exact species name",
+            placeholder="Genus species",
+            key="bs_agent_organism_other",
+        ).strip()
+
+    rule_standard = st.selectbox(
+        "Edición independiente para reglas",
+        options=_RULE_STANDARDS,
+        index=1,
+        key="bs_agent_rule_standard",
+        help=(
+            "La medición continúa usando Ed33. Ed36 es un catálogo candidato; "
+            "sus reglas permanecen en borrador y no se ejecutan."
+        ),
+    )
+    search_alerts = st.checkbox(
+        "Buscar alertas públicas actuales del INS y OPS (Tavily)",
+        value=False,
+        key="bs_agent_search_alerts",
+        help="Envía solo consultas generales fijas; nunca la especie ni las lecturas.",
+    )
+    consent = st.checkbox(
+        "I confirm this sample is synthetic or non-identifiable and authorize sending "
+        "its structured report context, including measurements and image hash, to Nebius.",
+        value=False,
+        key="bs_agent_consent",
+    )
+
+    changed_overrides = _manual_override_indices(result)
+    if changed_overrides:
+        st.warning(
+            "Manual overrides are active on disks "
+            f"{', '.join(str(index + 1) for index in changed_overrides)}. Report v1 "
+            "does not record who changed a zone or the correction's provenance, so "
+            "edited readings will not be sent to the agent. Restore the automatic "
+            "values to generate a report."
+        )
+
+    if st.button("Generar informe del agente", type="primary", key="bs_run_agent_review"):
+        if not organism or organism == "Other":
+            st.error("Select or enter an exact species before continuing.")
+        elif not consent:
+            st.error("First confirm that the data are synthetic or non-identifiable.")
+        elif changed_overrides:
+            st.error("Restore manual overrides to keep the report traceable.")
+        else:
+            try:
+                _load_local_provider_environment()
+                from bacterioscope.agent.nemotron_client import TokenFactoryClient
+                from bacterioscope.agent.orchestrator import review_plate
+                from bacterioscope.integrations.tavily import TavilyAlertSearch
+
+                client = TokenFactoryClient()
+                alert_sources = ["ins", "ops"] if search_alerts else []
+                alert_search = TavilyAlertSearch() if search_alerts else None
+                report_input = dataclasses.replace(result, classifications=effective)
+                with st.spinner("Generando y validando el informe..."):
+                    outcome = review_plate(
+                        report_input,
+                        organism=organism,
+                        rule_standard=rule_standard,
+                        client=client,
+                        alert_search=alert_search,
+                        alert_sources=alert_sources,
+                    )
+                signature = (
+                    organism,
+                    rule_standard,
+                    search_alerts,
+                    result.image_sha256,
+                    tuple(
+                        (item.antibiotic, item.zone_diameter_mm, item.category)
+                        for item in effective
+                    ),
+                    tuple(tuple(flags) for flags in (result.flags or [])),
+                )
+                st.session_state["bs_agent_report"] = outcome.report
+                st.session_state["bs_agent_report_signature"] = signature
+            except Exception as exc:
+                st.error(
+                    "Could not generate the report. Check server dependencies and "
+                    f"configuration ({type(exc).__name__}); secret values are hidden."
+                )
+
+    report = st.session_state.get("bs_agent_report")
+    signature = st.session_state.get("bs_agent_report_signature")
+    current_signature = (
+        organism,
+        rule_standard,
+        search_alerts,
+        result.image_sha256,
+        tuple(
+            (item.antibiotic, item.zone_diameter_mm, item.category)
+            for item in effective
+        ),
+        tuple(tuple(flags) for flags in (result.flags or [])),
+    )
+    if isinstance(report, dict):
+        if signature == current_signature:
+            _render_agent_report(report)
+        else:
+            st.info("Selections changed; generate a new report for the current inputs.")
 
 
 # ---------------------------------------------------------------------------
@@ -590,6 +871,8 @@ def main() -> None:
             st.error(str(exc))
 
     _show_results(result, pipeline.classifier, vis, panel_labels)
+    effective = _effective_classifications(result, pipeline.classifier, panel_labels)
+    _agent_review_panel(result, effective)
 
 
 if __name__ == "__main__":

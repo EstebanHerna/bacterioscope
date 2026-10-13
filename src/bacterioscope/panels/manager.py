@@ -21,6 +21,7 @@ import yaml
 from bacterioscope.detection.detector import DiskResult
 
 _DEFAULT_PANEL_DIR = Path(__file__).parent.parent.parent.parent / "panels"
+_TOP_WRAP_TOLERANCE_RAD = math.radians(2.0)
 
 
 @dataclass
@@ -114,7 +115,13 @@ class PanelManager:
         def _angle(disk: DiskResult) -> float:
             dx = float(disk.center_x - cx)
             dy = float(disk.center_y - cy)
-            return math.atan2(dx, -dy) % (2.0 * math.pi)
+            angle = math.atan2(dx, -dy) % (2.0 * math.pi)
+            # Hough centers can be off by one pixel. Keep a detection just to
+            # the counter-clockwise side of 12 o'clock adjacent to zero rather
+            # than sorting it after every other disk at almost 2*pi.
+            if angle > 2.0 * math.pi - _TOP_WRAP_TOLERANCE_RAD:
+                return angle - 2.0 * math.pi
+            return angle
 
         sorted_idx = sorted(range(len(disks)), key=lambda i: _angle(disks[i]))
         labels: list[str] = [""] * len(disks)

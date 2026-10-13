@@ -49,7 +49,7 @@ import logging
 import subprocess  # nosec B404
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -617,22 +617,15 @@ class BacterioScopePipeline:
         Returns:
             New AnalysisResult with updated classifications.
         """
+        if len(labels) != len(result.disks) or len(result.zones) != len(result.disks):
+            raise ValueError(
+                "labels, disks, and zones must have the same length for panel assignment"
+            )
         new_cls = [
             self.classifier.classify(antibiotic=label, zone_diameter_mm=z.diameter_mm)
             for label, z in zip(labels, result.zones)
         ]
-        return AnalysisResult(
-            image_path=result.image_path,
-            plate_diameter_px=result.plate_diameter_px,
-            px_per_mm=result.px_per_mm,
-            disks=result.disks,
-            zones=result.zones,
-            classifications=new_cls,
-            annotated_image=result.annotated_image,
-            original_image=result.original_image,
-            flags=result.flags,
-            plate_center=result.plate_center,
-        )
+        return replace(result, classifications=new_cls)
 
     def analyze_safe(
         self,

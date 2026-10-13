@@ -165,6 +165,43 @@ streamlit run src/bacterioscope/app.py
 
 Opens at `http://localhost:8501`. Upload a plate photograph or click **Load example image** to analyse the built-in synthetic plate. Choose a fixed panel from the sidebar for automatic antibiotic assignment, or keep the default manual per-disk mode.
 
+## Test provider connections locally
+
+The local provider smoke check reads `.env` and never prints API keys. Install the
+agent extra, then run it from the repository root:
+
+```bash
+python -m pip install -e ".[agent]"
+python scripts/smoke_test_integrations.py
+```
+
+The default run lists the Nemotron models visible to the configured Nebius
+account and makes one fixed, public Tavily search for each of INS and OPS. Use
+`--skip-tavily` to avoid those two search requests. Add `--check-inference` to
+send one short, non-clinical prompt to the configured Nano model; this makes a
+small billable inference request. The script sends no plate images, isolate
+identifiers, or AST results to either provider.
+
+To run the complete local demo (synthetic plate analysis → rule tools → optional
+INS/OPS searches → Nemotron → validated report), run:
+
+```bash
+python scripts/demo_agent_review.py
+```
+
+This makes a small model request and up to two Tavily searches. Use
+`--skip-alerts` to avoid the searches. The default sample is generated and
+non-identifiable; custom images require manually supplied disk names with
+`--antibiotics` in clockwise order from 12 o'clock. Disk identity remains a
+human input. The report is a demo for microbiologist review, not a clinical
+result.
+
+Set `NEBIUS_API_KEY`, `TAVILY_API_KEY`, and the exact account-visible model IDs
+(`NEBIUS_MODEL_NANO`, `NEBIUS_MODEL_SUPER`, `NEBIUS_MODEL_ULTRA`) in the local
+`.env`. Never commit that file. This smoke check exercises provider access; it
+does not imply that the current Streamlit UI includes the agent review panel or
+that the prototype is validated for clinical use.
+
 ---
 
 ## Usage

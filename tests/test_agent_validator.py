@@ -65,6 +65,47 @@ class TestValidateAndRenderSuccess:
 
 
 class TestValidateAndRenderFallback:
+    def test_empty_catalog_cannot_be_described_as_no_rules_matched(self) -> None:
+        output = json.dumps({
+            "explanation": (
+                "No expert rules matched, and the catalogs have no rules configured."
+            ),
+            "evidence_ids": [],
+        })
+        result = validate_and_render(
+            output, deterministic_base=_deterministic_base(), evidence_ids=set()
+        )
+        assert result.status == "fallback"
+        assert result.fallback_reason == "rule_claim_conflicts_with_catalog_status"
+        assert result.report["model_explanation"] is None
+
+    def test_disabled_draft_catalog_cannot_be_described_as_unconfigured(self) -> None:
+        base = _deterministic_base(catalog_status={
+            "intrinsic_resistance": "rules_not_enabled_for_standard_or_review",
+            "phenotype": "no_rules_configured",
+            "cascade": "no_rules_configured",
+        })
+        output = json.dumps({
+            "explanation": (
+                "Expert-rule evaluation was unavailable because no expert-rule "
+                "catalogs are configured."
+            ),
+            "evidence_ids": [],
+        })
+        result = validate_and_render(output, deterministic_base=base, evidence_ids=set())
+        assert result.status == "fallback"
+        assert result.fallback_reason == "rule_claim_conflicts_with_catalog_status"
+
+    def test_empty_catalog_can_be_described_as_unavailable(self) -> None:
+        output = json.dumps({
+            "explanation": "Expert rule evaluation was unavailable: no rules configured.",
+            "evidence_ids": [],
+        })
+        result = validate_and_render(
+            output, deterministic_base=_deterministic_base(), evidence_ids=set()
+        )
+        assert result.status == "grounded_report"
+
     def test_invalid_json_falls_back(self) -> None:
         result = validate_and_render(
             "not json{{", deterministic_base=_deterministic_base(), evidence_ids=set()
