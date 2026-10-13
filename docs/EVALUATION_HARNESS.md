@@ -25,7 +25,13 @@ These unit tests prove code behavior only. Synthetic rule fixtures are not clini
 
 ### 2. Agent/tool contract harness
 
-Esteban owns the lab-review request/response contract, and it is not frozen yet. The existing `tests/agent_harness/` directory contains legacy education-only fixtures; it is not the AST integration contract or a batch-evaluation set. Keep those fixtures out of CLSI/AST evaluation. Add the executable lab-review contract fixtures only after Esteban publishes the versioned schema and confirms the mapping for AST observations, rule findings, public alerts, and catalog status.
+**Implemented (2026-10-12).** Esteban's `agent-review-v1` schema has been stable (additive-only fields) across every merge since PR #5 and is now frozen. `tests/agent_harness/lab_review_cases.py` implements the seven required cases below against real `agent/`/`rules/` code (only the model call is faked); `tests/test_agent_harness.py` runs it in CI. Run it directly for a per-case breakdown:
+
+```powershell
+python -m pytest tests/test_agent_harness.py -v
+```
+
+The pre-existing `tests/agent_harness/golden-cases.jsonl` fixtures remain legacy education-only content; they are not this contract and stay out of CLSI/AST evaluation.
 
 Required cases:
 
@@ -54,7 +60,7 @@ For Nebius, report model ID, job configuration, sample count, p50/p95 latency, e
 
 ## Go/no-go
 
-- **Go for tool integration:** all focused unit tests pass and the result contract is frozen by Esteban.
+- **Go for tool integration: met (2026-10-12).** All focused unit tests pass, the result contract is frozen, and `tests/test_agent_harness.py` (all 7 required cases) is green -- Daniel can build Docker/Serverless Jobs scaffolding against `review_plate()` and `agent-review-v1` now without waiting further on Esteban.
 - **Go for a clinical rule record:** exact source/edition, authorized reuse, qualified review/date, positive and negative tests, and integration standard all agree.
 - **Go for public demo:** no private data or secrets, empty catalog is visibly unavailable, alert citations remain official and clickable, and every claim maps to a measured artifact.
 - **No-go:** incompatible standards represented as concordance, synthetic clinical claims, hidden/unreviewed rules, or model-generated changes to deterministic output.
