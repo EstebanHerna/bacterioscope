@@ -187,6 +187,12 @@
       "maxLength": 1500,
       "description": "Nemotron's grounded narrative over the sections above. Null when status is 'fallback'."
     },
+    "cited_evidence_ids": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true,
+      "description": "Additive, optional (2026-10-17). The evidence ids model_explanation cites, each already checked against the citeable evidence of this report. Empty on fallback. Lets a reviewer trace every sentence of the narrative to a rule source or alert URL."
+    },
     "requires_human_review": {
       "type": "boolean",
       "description": "Always true in the current hackathon scope (AGENT_ARCHITECTURE.md: an accountable microbiologist stays in control); kept as a real field, not hardcoded, for when a narrower default is reviewed and approved."

@@ -71,6 +71,7 @@ def _build_fallback(deterministic_base: dict[str, Any], reason: str) -> dict[str
     fallback = dict(deterministic_base)
     fallback["status"] = "fallback"
     fallback["model_explanation"] = None
+    fallback["cited_evidence_ids"] = []
     fallback["fallback_reason"] = reason
     return fallback
 
@@ -188,6 +189,7 @@ def validate_and_render(
     candidate = dict(deterministic_base)
     candidate["status"] = "grounded_report"
     candidate["model_explanation"] = explanation
+    candidate["cited_evidence_ids"] = sorted(set(cited))
     candidate["fallback_reason"] = None
 
     try:

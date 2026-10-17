@@ -61,6 +61,13 @@ class ChatCompletionResult:
     model: str
     content: str
     finish_reason: str | None
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+
+
+def _usage_count(usage: Any, field_name: str) -> int | None:
+    value = getattr(usage, field_name, None) if usage is not None else None
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 class TokenFactoryClient:
@@ -194,6 +201,12 @@ class TokenFactoryClient:
                 f"(finish_reason={finish_reason}); verify model reasoning settings "
                 "or increase max_tokens"
             )
+        usage = getattr(response, "usage", None)
         return ChatCompletionResult(
-            tier=tier, model=model, content=content, finish_reason=choice.finish_reason
+            tier=tier,
+            model=model,
+            content=content,
+            finish_reason=choice.finish_reason,
+            prompt_tokens=_usage_count(usage, "prompt_tokens"),
+            completion_tokens=_usage_count(usage, "completion_tokens"),
         )

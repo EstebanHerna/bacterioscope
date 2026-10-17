@@ -1,0 +1,65 @@
+name: Agent evaluation
+
+# Runs the live agent benchmark (scripts/run_evaluation.py --live) with the
+# repository's NEBIUS_API_KEY / TAVILY_API_KEY secrets. Manual dispatch only:
+# never on pull_request, so secrets are not exposed to fork code, and every
+# run is a deliberate, billable action by someone with write access.
+
+on:
+  workflow_dispatch:
+    inputs:
+      modes:
+        description: "Space-separated benchmark modes"
+        default: "routed ultra_only"
+        required: true
+      alerts:
+        description: "Space-separated alert sources (ins ops), or leave empty"
+        default: "ins ops"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-eval
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[agent]"
+
+      - name: Run evaluation
+        env:
+          NEBIUS_API_KEY: ${{ secrets.NEBIUS_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          NEBIUS_MODEL_NANO: ${{ vars.NEBIUS_MODEL_NANO }}
+          NEBIUS_MODEL_SUPER: ${{ vars.NEBIUS_MODEL_SUPER }}
+          NEBIUS_MODEL_ULTRA: ${{ vars.NEBIUS_MODEL_ULTRA }}
+          MODES: ${{ inputs.modes }}
+          ALERTS: ${{ inputs.alerts }}
+        run: |
+          read -r -a mode_args <<< "$MODES"
+          read -r -a alert_args <<< "$ALERTS"
+          args=(--live --output-dir eval-out --modes "${mode_args[@]}")
+          if [ "${#alert_args[@]}" -gt 0 ]; then args+=(--alerts "${alert_args[@]}"); fi
+          python scripts/run_evaluation.py "${args[@]}"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation
+          path: eval-out
+          if-no-files-found: error
