@@ -59,6 +59,8 @@ Implemented in `src/bacterioscope/integrations/tavily.py` as `TavilyAlertSearch.
 
 `review_plate()` can run fixed-query search when given `alert_sources=["ins", "ops"]`; it reads the server-side `TAVILY_API_KEY` through `TavilyAlertSearch`, or accepts an injected client for tests. The report carries `alert_search_status` (`available`, `no_results`, `partial`, `unavailable`, `provided`, or `not_requested`) along with eligible alert fields. Search errors do not abort plate review. The module uses Python's standard library; no new runtime dependency is required. Do not commit the API key or copy it into this document.
 
+For a local provider check, install `.[agent]` and run `python scripts/smoke_test_integrations.py`. The script loads the repository-root `.env`, lists the Nemotron models visible to the configured Nebius account, verifies the three tier IDs, and runs at most one fixed Tavily query for each allowed public source. `--skip-tavily` skips those searches; `--check-inference` opts into one short, potentially billable Nano request. The script never sends AST or isolate data and never prints key values. This verifies credentials and provider connectivity only; it does not activate draft clinical rules or validate clinical behavior.
+
 ## P2-3: UZH/Dryad phenotype indicators and provenance
 
 Implemented in `src/bacterioscope/phenotypes/uzh.py` and `scripts/extract_uzh_phenotypes.py`.

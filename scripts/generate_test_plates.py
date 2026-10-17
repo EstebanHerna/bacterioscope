@@ -76,7 +76,10 @@ def _make_plate(
         zone = cv2.GaussianBlur(zone, (25, 25), 9)
         for c in range(3):
             agar[:, :, c] = np.clip(
-                agar[:, :, c].astype(np.float32) + zone * 26, 0, 255
+                # Match the dark-zone polarity expected by ZoneSegmenter.
+                # This makes the synthetic fixtures useful for exercising the
+                # current algorithm; it is not evidence of real-image accuracy.
+                agar[:, :, c].astype(np.float32) - zone * 26, 0, 255
             ).astype(np.uint8)
 
     rng = np.random.default_rng(seed)
@@ -87,7 +90,9 @@ def _make_plate(
         yy, xx = np.mgrid[0:SIZE, 0:SIZE]
         gradient = (xx / SIZE * illumination_tilt * 40).astype(np.int16)
         for c in range(3):
-            agar[:, :, c] = np.clip(agar[:, :, c].astype(np.int16) + gradient, 0, 255).astype(np.uint8)
+            agar[:, :, c] = np.clip(
+                agar[:, :, c].astype(np.int16) + gradient, 0, 255
+            ).astype(np.uint8)
 
     img[mask_plate > 0] = agar[mask_plate > 0]
 
@@ -203,7 +208,10 @@ def main() -> int:
         print(f"  {path.name}  [{cat_str}]")
 
     print(f"\n{len(generated) * 2} images written to examples/synthetic/")
-    print("Drop any *.png from examples/synthetic/ (not reference_annotated/) into the Streamlit demo to test.")
+    print(
+        "Drop any *.png from examples/synthetic/ (not reference_annotated/) "
+        "into the Streamlit demo to test."
+    )
     return 0
 
 
