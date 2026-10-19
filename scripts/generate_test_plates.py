@@ -124,56 +124,117 @@ def _mm_to_px(mm: float) -> int:
     return int(mm / 2 * PX_PER_MM)
 
 
+_PLATE_SPECS: list[tuple[str, dict]] = [
+    # 1. Susceptible majority — organism that responds well to most antibiotics
+    ("plate_pan_susceptible", {
+        "angles": _ANGLES_6, "ring": _RING_6, "names": PANEL_6, "seed": 10,
+        "zone_mm": [27.0, 28.0, 20.0, 26.0, 25.0, 18.0],
+    }),
+    # 2. MDR — multidrug-resistant: most antibiotics fail
+    ("plate_mdr_organism", {
+        "angles": _ANGLES_6, "ring": _RING_6, "names": PANEL_6, "seed": 77,
+        "zone_mm": [12.0, 10.0, 9.0, 15.0, 11.0, 8.0],
+    }),
+    # 3. Mixed profile — typical clinical isolate with partial resistance
+    ("plate_mixed_sir", {
+        "angles": _ANGLES_6, "ring": _RING_6, "names": PANEL_6, "seed": 33,
+        "zone_mm": [24.0, 23.0, 11.0, 21.0, 22.5, 16.0],
+    }),
+    # 4. 12-disk panel — full enterobacteria workup
+    ("plate_12disk_panel", {
+        "angles": _ANGLES_12, "ring": _RING_12, "names": PANEL_12, "seed": 55,
+        "zone_mm": [25.0, 24.0, 10.0, 23.0, 22.0, 18.0, 27.0, 21.0, 23.0, 19.0, 14.0, 16.0],
+    }),
+    # 5. Carbapenem-resistant — critical alert scenario
+    ("plate_carbapenem_resistant", {
+        "angles": _ANGLES_6, "ring": _RING_6, "names": PANEL_6, "seed": 91,
+        "zone_mm": [11.0, 10.0, 9.0, 9.0, 12.0, 8.0],
+    }),
+    # 6. Illumination tilt — tests robustness to uneven lighting
+    ("plate_uneven_light", {
+        "angles": _ANGLES_6, "ring": _RING_6, "names": PANEL_6, "seed": 44,
+        "zone_mm": [26.0, 22.0, 14.0, 24.0, 21.0, 17.0],
+        "illumination_tilt": 1.0,
+    }),
+    # 7. Large zones — very susceptible organism with wide halos
+    ("plate_large_zones", {
+        "angles": _ANGLES_6, "ring": _RING_6, "names": PANEL_6, "seed": 22,
+        "zone_mm": [33.0, 35.0, 30.0, 36.0, 32.0, 28.0],
+    }),
+    # 8. ESBL-like profile — resistant to most cephalosporins, preserved carbapenems
+    ("plate_esbl_like", {
+        "angles": _ANGLES_6, "ring": _RING_6, "names": PANEL_6, "seed": 66,
+        "zone_mm": [27.0, 12.0, 9.0, 11.0, 26.0, 14.0],
+    }),
+]
+
+
+# Classifier keys for the panel display names above (the display names are
+# kept short for the drawn labels; the classifier needs its own spelling).
+_CLASSIFIER_KEY = {
+    "Meropenem": "meropenem", "Ciprofloxacin": "ciprofloxacin",
+    "Ampicillin": "ampicillin", "Ceftriaxone": "ceftriaxone",
+    "Imipenem": "imipenem", "Gentamicin": "gentamicin", "Cefepime": "cefepime",
+    "Piperacillin-Tazo": "piperacillin-tazobactam", "Ertapenem": "ertapenem",
+    "Amikacin": "amikacin", "Levofloxacin": "levofloxacin",
+    "TMP-SMX": "trimethoprim-sulfamethoxazole",
+}
+
+
+def ground_truth() -> list[dict]:
+    """Return the exact drawn geometry of every synthetic plate.
+
+    ``drawn_mm`` is the zone diameter actually drawn, expressed in the frame
+    the pipeline calibrates to (the drawn plate rim = 90 mm). The scenario
+    table's ``nominal_mm`` is not that value: ``PX_PER_MM`` assumes the
+    540 px image spans 102.6 mm while the plate is drawn with a 252 px
+    radius, so nominal values run ~6% larger than what a 90 mm-rim
+    calibration should recover, on top of integer-pixel truncation.
+    """
+    plate_px_per_mm = 2 * PLATE_R / 90.0
+    plates = []
+    for fname, cfg in _PLATE_SPECS:
+        disks = []
+        for (cx, cy), name, mm in zip(
+            _positions(cfg["angles"], cfg["ring"]), cfg["names"], cfg["zone_mm"]
+        ):
+            zone_px = _mm_to_px(mm)
+            disks.append({
+                "antibiotic": _CLASSIFIER_KEY[name],
+                "display_name": name,
+                "center_px": [cx, cy],
+                "zone_radius_px": zone_px,
+                "nominal_mm": mm,
+                "drawn_mm": round(2 * zone_px / plate_px_per_mm, 3),
+            })
+        plates.append({"image": f"{fname}.png", "disks": disks})
+    return plates
+
+
+def write_ground_truth(path: Path) -> Path:
+    """Write ``ground_truth()`` as JSON next to the synthetic images."""
+    import json
+
+    payload = {
+        "frame": "plate rim drawn as 90 mm; drawn_mm is the primary reference",
+        "plate_radius_px": PLATE_R,
+        "plates": ground_truth(),
+    }
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
 def main() -> int:
     root = Path(__file__).parent.parent / "examples" / "synthetic"
+    if "--truth-only" in sys.argv:
+        print(f"Wrote {write_ground_truth(root / 'ground_truth.json')}")
+        return 0
     out = root
     out_annotated = root / "reference_annotated"
     out.mkdir(parents=True, exist_ok=True)
     out_annotated.mkdir(parents=True, exist_ok=True)
 
-    plates: list[tuple[str, dict]] = [
-        # 1. Susceptible majority — organism that responds well to most antibiotics
-        ("plate_pan_susceptible", {
-            "angles": _ANGLES_6, "ring": _RING_6, "names": PANEL_6, "seed": 10,
-            "zone_mm": [27.0, 28.0, 20.0, 26.0, 25.0, 18.0],
-        }),
-        # 2. MDR — multidrug-resistant: most antibiotics fail
-        ("plate_mdr_organism", {
-            "angles": _ANGLES_6, "ring": _RING_6, "names": PANEL_6, "seed": 77,
-            "zone_mm": [12.0, 10.0, 9.0, 15.0, 11.0, 8.0],
-        }),
-        # 3. Mixed profile — typical clinical isolate with partial resistance
-        ("plate_mixed_sir", {
-            "angles": _ANGLES_6, "ring": _RING_6, "names": PANEL_6, "seed": 33,
-            "zone_mm": [24.0, 23.0, 11.0, 21.0, 22.5, 16.0],
-        }),
-        # 4. 12-disk panel — full enterobacteria workup
-        ("plate_12disk_panel", {
-            "angles": _ANGLES_12, "ring": _RING_12, "names": PANEL_12, "seed": 55,
-            "zone_mm": [25.0, 24.0, 10.0, 23.0, 22.0, 18.0, 27.0, 21.0, 23.0, 19.0, 14.0, 16.0],
-        }),
-        # 5. Carbapenem-resistant — critical alert scenario
-        ("plate_carbapenem_resistant", {
-            "angles": _ANGLES_6, "ring": _RING_6, "names": PANEL_6, "seed": 91,
-            "zone_mm": [11.0, 10.0, 9.0, 9.0, 12.0, 8.0],
-        }),
-        # 6. Illumination tilt — tests robustness to uneven lighting
-        ("plate_uneven_light", {
-            "angles": _ANGLES_6, "ring": _RING_6, "names": PANEL_6, "seed": 44,
-            "zone_mm": [26.0, 22.0, 14.0, 24.0, 21.0, 17.0],
-            "illumination_tilt": 1.0,
-        }),
-        # 7. Large zones — very susceptible organism with wide halos
-        ("plate_large_zones", {
-            "angles": _ANGLES_6, "ring": _RING_6, "names": PANEL_6, "seed": 22,
-            "zone_mm": [33.0, 35.0, 30.0, 36.0, 32.0, 28.0],
-        }),
-        # 8. ESBL-like profile — resistant to most cephalosporins, preserved carbapenems
-        ("plate_esbl_like", {
-            "angles": _ANGLES_6, "ring": _RING_6, "names": PANEL_6, "seed": 66,
-            "zone_mm": [27.0, 12.0, 9.0, 11.0, 26.0, 14.0],
-        }),
-    ]
+    plates = _PLATE_SPECS
 
     generated = []
     for fname, cfg in plates:

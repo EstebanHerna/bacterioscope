@@ -1,0 +1,640 @@
+{
+  "frame": "plate rim drawn as 90 mm; drawn_mm is the primary reference",
+  "plate_radius_px": 252,
+  "plates": [
+    {
+      "image": "plate_pan_susceptible.png",
+      "disks": [
+        {
+          "antibiotic": "meropenem",
+          "display_name": "Meropenem",
+          "center_px": [
+            270,
+            100
+          ],
+          "zone_radius_px": 71,
+          "nominal_mm": 27.0,
+          "drawn_mm": 25.357
+        },
+        {
+          "antibiotic": "ciprofloxacin",
+          "display_name": "Ciprofloxacin",
+          "center_px": [
+            417,
+            186
+          ],
+          "zone_radius_px": 73,
+          "nominal_mm": 28.0,
+          "drawn_mm": 26.071
+        },
+        {
+          "antibiotic": "ampicillin",
+          "display_name": "Ampicillin",
+          "center_px": [
+            417,
+            355
+          ],
+          "zone_radius_px": 52,
+          "nominal_mm": 20.0,
+          "drawn_mm": 18.571
+        },
+        {
+          "antibiotic": "ceftriaxone",
+          "display_name": "Ceftriaxone",
+          "center_px": [
+            270,
+            440
+          ],
+          "zone_radius_px": 68,
+          "nominal_mm": 26.0,
+          "drawn_mm": 24.286
+        },
+        {
+          "antibiotic": "imipenem",
+          "display_name": "Imipenem",
+          "center_px": [
+            123,
+            355
+          ],
+          "zone_radius_px": 65,
+          "nominal_mm": 25.0,
+          "drawn_mm": 23.214
+        },
+        {
+          "antibiotic": "gentamicin",
+          "display_name": "Gentamicin",
+          "center_px": [
+            123,
+            186
+          ],
+          "zone_radius_px": 47,
+          "nominal_mm": 18.0,
+          "drawn_mm": 16.786
+        }
+      ]
+    },
+    {
+      "image": "plate_mdr_organism.png",
+      "disks": [
+        {
+          "antibiotic": "meropenem",
+          "display_name": "Meropenem",
+          "center_px": [
+            270,
+            100
+          ],
+          "zone_radius_px": 31,
+          "nominal_mm": 12.0,
+          "drawn_mm": 11.071
+        },
+        {
+          "antibiotic": "ciprofloxacin",
+          "display_name": "Ciprofloxacin",
+          "center_px": [
+            417,
+            186
+          ],
+          "zone_radius_px": 26,
+          "nominal_mm": 10.0,
+          "drawn_mm": 9.286
+        },
+        {
+          "antibiotic": "ampicillin",
+          "display_name": "Ampicillin",
+          "center_px": [
+            417,
+            355
+          ],
+          "zone_radius_px": 23,
+          "nominal_mm": 9.0,
+          "drawn_mm": 8.214
+        },
+        {
+          "antibiotic": "ceftriaxone",
+          "display_name": "Ceftriaxone",
+          "center_px": [
+            270,
+            440
+          ],
+          "zone_radius_px": 39,
+          "nominal_mm": 15.0,
+          "drawn_mm": 13.929
+        },
+        {
+          "antibiotic": "imipenem",
+          "display_name": "Imipenem",
+          "center_px": [
+            123,
+            355
+          ],
+          "zone_radius_px": 28,
+          "nominal_mm": 11.0,
+          "drawn_mm": 10.0
+        },
+        {
+          "antibiotic": "gentamicin",
+          "display_name": "Gentamicin",
+          "center_px": [
+            123,
+            186
+          ],
+          "zone_radius_px": 21,
+          "nominal_mm": 8.0,
+          "drawn_mm": 7.5
+        }
+      ]
+    },
+    {
+      "image": "plate_mixed_sir.png",
+      "disks": [
+        {
+          "antibiotic": "meropenem",
+          "display_name": "Meropenem",
+          "center_px": [
+            270,
+            100
+          ],
+          "zone_radius_px": 63,
+          "nominal_mm": 24.0,
+          "drawn_mm": 22.5
+        },
+        {
+          "antibiotic": "ciprofloxacin",
+          "display_name": "Ciprofloxacin",
+          "center_px": [
+            417,
+            186
+          ],
+          "zone_radius_px": 60,
+          "nominal_mm": 23.0,
+          "drawn_mm": 21.429
+        },
+        {
+          "antibiotic": "ampicillin",
+          "display_name": "Ampicillin",
+          "center_px": [
+            417,
+            355
+          ],
+          "zone_radius_px": 28,
+          "nominal_mm": 11.0,
+          "drawn_mm": 10.0
+        },
+        {
+          "antibiotic": "ceftriaxone",
+          "display_name": "Ceftriaxone",
+          "center_px": [
+            270,
+            440
+          ],
+          "zone_radius_px": 55,
+          "nominal_mm": 21.0,
+          "drawn_mm": 19.643
+        },
+        {
+          "antibiotic": "imipenem",
+          "display_name": "Imipenem",
+          "center_px": [
+            123,
+            355
+          ],
+          "zone_radius_px": 59,
+          "nominal_mm": 22.5,
+          "drawn_mm": 21.071
+        },
+        {
+          "antibiotic": "gentamicin",
+          "display_name": "Gentamicin",
+          "center_px": [
+            123,
+            186
+          ],
+          "zone_radius_px": 42,
+          "nominal_mm": 16.0,
+          "drawn_mm": 15.0
+        }
+      ]
+    },
+    {
+      "image": "plate_12disk_panel.png",
+      "disks": [
+        {
+          "antibiotic": "meropenem",
+          "display_name": "Meropenem",
+          "center_px": [
+            270,
+            100
+          ],
+          "zone_radius_px": 65,
+          "nominal_mm": 25.0,
+          "drawn_mm": 23.214
+        },
+        {
+          "antibiotic": "ciprofloxacin",
+          "display_name": "Ciprofloxacin",
+          "center_px": [
+            355,
+            123
+          ],
+          "zone_radius_px": 63,
+          "nominal_mm": 24.0,
+          "drawn_mm": 22.5
+        },
+        {
+          "antibiotic": "ampicillin",
+          "display_name": "Ampicillin",
+          "center_px": [
+            417,
+            186
+          ],
+          "zone_radius_px": 26,
+          "nominal_mm": 10.0,
+          "drawn_mm": 9.286
+        },
+        {
+          "antibiotic": "ceftriaxone",
+          "display_name": "Ceftriaxone",
+          "center_px": [
+            440,
+            270
+          ],
+          "zone_radius_px": 60,
+          "nominal_mm": 23.0,
+          "drawn_mm": 21.429
+        },
+        {
+          "antibiotic": "imipenem",
+          "display_name": "Imipenem",
+          "center_px": [
+            417,
+            355
+          ],
+          "zone_radius_px": 57,
+          "nominal_mm": 22.0,
+          "drawn_mm": 20.357
+        },
+        {
+          "antibiotic": "gentamicin",
+          "display_name": "Gentamicin",
+          "center_px": [
+            355,
+            417
+          ],
+          "zone_radius_px": 47,
+          "nominal_mm": 18.0,
+          "drawn_mm": 16.786
+        },
+        {
+          "antibiotic": "cefepime",
+          "display_name": "Cefepime",
+          "center_px": [
+            270,
+            440
+          ],
+          "zone_radius_px": 71,
+          "nominal_mm": 27.0,
+          "drawn_mm": 25.357
+        },
+        {
+          "antibiotic": "piperacillin-tazobactam",
+          "display_name": "Piperacillin-Tazo",
+          "center_px": [
+            185,
+            417
+          ],
+          "zone_radius_px": 55,
+          "nominal_mm": 21.0,
+          "drawn_mm": 19.643
+        },
+        {
+          "antibiotic": "ertapenem",
+          "display_name": "Ertapenem",
+          "center_px": [
+            123,
+            355
+          ],
+          "zone_radius_px": 60,
+          "nominal_mm": 23.0,
+          "drawn_mm": 21.429
+        },
+        {
+          "antibiotic": "amikacin",
+          "display_name": "Amikacin",
+          "center_px": [
+            100,
+            270
+          ],
+          "zone_radius_px": 50,
+          "nominal_mm": 19.0,
+          "drawn_mm": 17.857
+        },
+        {
+          "antibiotic": "levofloxacin",
+          "display_name": "Levofloxacin",
+          "center_px": [
+            123,
+            186
+          ],
+          "zone_radius_px": 36,
+          "nominal_mm": 14.0,
+          "drawn_mm": 12.857
+        },
+        {
+          "antibiotic": "trimethoprim-sulfamethoxazole",
+          "display_name": "TMP-SMX",
+          "center_px": [
+            186,
+            123
+          ],
+          "zone_radius_px": 42,
+          "nominal_mm": 16.0,
+          "drawn_mm": 15.0
+        }
+      ]
+    },
+    {
+      "image": "plate_carbapenem_resistant.png",
+      "disks": [
+        {
+          "antibiotic": "meropenem",
+          "display_name": "Meropenem",
+          "center_px": [
+            270,
+            100
+          ],
+          "zone_radius_px": 28,
+          "nominal_mm": 11.0,
+          "drawn_mm": 10.0
+        },
+        {
+          "antibiotic": "ciprofloxacin",
+          "display_name": "Ciprofloxacin",
+          "center_px": [
+            417,
+            186
+          ],
+          "zone_radius_px": 26,
+          "nominal_mm": 10.0,
+          "drawn_mm": 9.286
+        },
+        {
+          "antibiotic": "ampicillin",
+          "display_name": "Ampicillin",
+          "center_px": [
+            417,
+            355
+          ],
+          "zone_radius_px": 23,
+          "nominal_mm": 9.0,
+          "drawn_mm": 8.214
+        },
+        {
+          "antibiotic": "ceftriaxone",
+          "display_name": "Ceftriaxone",
+          "center_px": [
+            270,
+            440
+          ],
+          "zone_radius_px": 23,
+          "nominal_mm": 9.0,
+          "drawn_mm": 8.214
+        },
+        {
+          "antibiotic": "imipenem",
+          "display_name": "Imipenem",
+          "center_px": [
+            123,
+            355
+          ],
+          "zone_radius_px": 31,
+          "nominal_mm": 12.0,
+          "drawn_mm": 11.071
+        },
+        {
+          "antibiotic": "gentamicin",
+          "display_name": "Gentamicin",
+          "center_px": [
+            123,
+            186
+          ],
+          "zone_radius_px": 21,
+          "nominal_mm": 8.0,
+          "drawn_mm": 7.5
+        }
+      ]
+    },
+    {
+      "image": "plate_uneven_light.png",
+      "disks": [
+        {
+          "antibiotic": "meropenem",
+          "display_name": "Meropenem",
+          "center_px": [
+            270,
+            100
+          ],
+          "zone_radius_px": 68,
+          "nominal_mm": 26.0,
+          "drawn_mm": 24.286
+        },
+        {
+          "antibiotic": "ciprofloxacin",
+          "display_name": "Ciprofloxacin",
+          "center_px": [
+            417,
+            186
+          ],
+          "zone_radius_px": 57,
+          "nominal_mm": 22.0,
+          "drawn_mm": 20.357
+        },
+        {
+          "antibiotic": "ampicillin",
+          "display_name": "Ampicillin",
+          "center_px": [
+            417,
+            355
+          ],
+          "zone_radius_px": 36,
+          "nominal_mm": 14.0,
+          "drawn_mm": 12.857
+        },
+        {
+          "antibiotic": "ceftriaxone",
+          "display_name": "Ceftriaxone",
+          "center_px": [
+            270,
+            440
+          ],
+          "zone_radius_px": 63,
+          "nominal_mm": 24.0,
+          "drawn_mm": 22.5
+        },
+        {
+          "antibiotic": "imipenem",
+          "display_name": "Imipenem",
+          "center_px": [
+            123,
+            355
+          ],
+          "zone_radius_px": 55,
+          "nominal_mm": 21.0,
+          "drawn_mm": 19.643
+        },
+        {
+          "antibiotic": "gentamicin",
+          "display_name": "Gentamicin",
+          "center_px": [
+            123,
+            186
+          ],
+          "zone_radius_px": 44,
+          "nominal_mm": 17.0,
+          "drawn_mm": 15.714
+        }
+      ]
+    },
+    {
+      "image": "plate_large_zones.png",
+      "disks": [
+        {
+          "antibiotic": "meropenem",
+          "display_name": "Meropenem",
+          "center_px": [
+            270,
+            100
+          ],
+          "zone_radius_px": 86,
+          "nominal_mm": 33.0,
+          "drawn_mm": 30.714
+        },
+        {
+          "antibiotic": "ciprofloxacin",
+          "display_name": "Ciprofloxacin",
+          "center_px": [
+            417,
+            186
+          ],
+          "zone_radius_px": 92,
+          "nominal_mm": 35.0,
+          "drawn_mm": 32.857
+        },
+        {
+          "antibiotic": "ampicillin",
+          "display_name": "Ampicillin",
+          "center_px": [
+            417,
+            355
+          ],
+          "zone_radius_px": 78,
+          "nominal_mm": 30.0,
+          "drawn_mm": 27.857
+        },
+        {
+          "antibiotic": "ceftriaxone",
+          "display_name": "Ceftriaxone",
+          "center_px": [
+            270,
+            440
+          ],
+          "zone_radius_px": 94,
+          "nominal_mm": 36.0,
+          "drawn_mm": 33.571
+        },
+        {
+          "antibiotic": "imipenem",
+          "display_name": "Imipenem",
+          "center_px": [
+            123,
+            355
+          ],
+          "zone_radius_px": 84,
+          "nominal_mm": 32.0,
+          "drawn_mm": 30.0
+        },
+        {
+          "antibiotic": "gentamicin",
+          "display_name": "Gentamicin",
+          "center_px": [
+            123,
+            186
+          ],
+          "zone_radius_px": 73,
+          "nominal_mm": 28.0,
+          "drawn_mm": 26.071
+        }
+      ]
+    },
+    {
+      "image": "plate_esbl_like.png",
+      "disks": [
+        {
+          "antibiotic": "meropenem",
+          "display_name": "Meropenem",
+          "center_px": [
+            270,
+            100
+          ],
+          "zone_radius_px": 71,
+          "nominal_mm": 27.0,
+          "drawn_mm": 25.357
+        },
+        {
+          "antibiotic": "ciprofloxacin",
+          "display_name": "Ciprofloxacin",
+          "center_px": [
+            417,
+            186
+          ],
+          "zone_radius_px": 31,
+          "nominal_mm": 12.0,
+          "drawn_mm": 11.071
+        },
+        {
+          "antibiotic": "ampicillin",
+          "display_name": "Ampicillin",
+          "center_px": [
+            417,
+            355
+          ],
+          "zone_radius_px": 23,
+          "nominal_mm": 9.0,
+          "drawn_mm": 8.214
+        },
+        {
+          "antibiotic": "ceftriaxone",
+          "display_name": "Ceftriaxone",
+          "center_px": [
+            270,
+            440
+          ],
+          "zone_radius_px": 28,
+          "nominal_mm": 11.0,
+          "drawn_mm": 10.0
+        },
+        {
+          "antibiotic": "imipenem",
+          "display_name": "Imipenem",
+          "center_px": [
+            123,
+            355
+          ],
+          "zone_radius_px": 68,
+          "nominal_mm": 26.0,
+          "drawn_mm": 24.286
+        },
+        {
+          "antibiotic": "gentamicin",
+          "display_name": "Gentamicin",
+          "center_px": [
+            123,
+            186
+          ],
+          "zone_radius_px": 36,
+          "nominal_mm": 14.0,
+          "drawn_mm": 12.857
+        }
+      ]
+    }
+  ]
+}

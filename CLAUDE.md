@@ -82,6 +82,9 @@ bacterioscope/
         cli.py                     <- CLI entry point (Typer)
         app.py                     <- Streamlit demo
         _app_logic.py              <- pure helpers with no Streamlit import (testable without UI)
+        plate_session.py           <- review sessions (LRU, labels, corrections, agent review) shared
+                                       by api/lab.py and mcp_server.py; raises domain errors only
+        mcp_server.py              <- MCP server (FastMCP, `bacterioscope-mcp`), disks by clockwise position
         design/
             tokens.py               <- Clinical Slate palette/typography tokens (single source of color)
         detection/
@@ -101,8 +104,11 @@ bacterioscope/
         panels/
             manager.py                 <- PanelManager: load YAML, assign antibiotics by angular position
         api/
-            routes.py                   <- FastAPI endpoints
+            routes.py                   <- FastAPI endpoints; serves the light-box web app at /
+            lab.py                       <- light-box API (/api): plates, classify, panel, agent review
             schemas.py                   <- Pydantic v2 request/response schemas
+        web/                            <- light-box front end (index.html, app.css, app.js); CSP forbids
+                                           inline styles, so app.js sets styles through CSSOM
         utils/
             calibration.py                <- px/mm: plate-rim (Phase 0) or disk-diameter (Phase 3)
             visualization.py               <- annotated output images

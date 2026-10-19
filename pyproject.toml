@@ -32,6 +32,7 @@ dependencies = [
     "Pillow>=10.0",
     "typer>=0.9",
     "rich>=13.0",
+    "PyYAML>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -52,6 +53,11 @@ ui = [
 agent = [
     "openai>=1.40",
     "python-dotenv>=1.0",
+    "jsonschema>=4.20",
+]
+mcp = [
+    "mcp>=1.12,<2",
+    "python-dotenv>=1.0",
 ]
 dev = [
     "pytest>=7.4",
@@ -67,15 +73,17 @@ dev = [
     "openpyxl>=3.1",
     "jsonschema>=4.20",
 ]
-all = ["bacterioscope[ml,api,ui,agent]"]
+all = ["bacterioscope[ml,api,ui,agent,mcp]"]
 
 [project.scripts]
 bacterioscope = "bacterioscope.cli:app"
+bacterioscope-mcp = "bacterioscope.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
+"bacterioscope" = ["web/*.html", "web/*.css", "web/*.js", "web/*.svg"]
 "bacterioscope.rules" = ["*.json"]
 
 [tool.ruff]

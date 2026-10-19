@@ -167,3 +167,19 @@ class TestValidateAndRenderFallback:
         result = validate_and_render(tampered, deterministic_base=base, evidence_ids=set())
         assert result.report["measurement"] == base["measurement"]
         assert result.report["requires_human_review"] is True
+
+
+class TestCitedEvidenceIds:
+    def test_grounded_report_keeps_sorted_unique_citations(self) -> None:
+        output = json.dumps({"explanation": "See both.", "evidence_ids": ["b", "a", "b"]})
+        result = validate_and_render(
+            output, deterministic_base=_deterministic_base(), evidence_ids={"a", "b"}
+        )
+        assert result.status == "grounded_report"
+        assert result.report["cited_evidence_ids"] == ["a", "b"]
+
+    def test_fallback_report_has_no_citations(self) -> None:
+        result = validate_and_render(
+            "not json{{", deterministic_base=_deterministic_base(), evidence_ids={"a"}
+        )
+        assert result.report["cited_evidence_ids"] == []

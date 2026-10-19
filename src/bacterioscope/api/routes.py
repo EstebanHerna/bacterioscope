@@ -28,12 +28,16 @@ Run with:
 
 from __future__ import annotations
 
+import contextlib
 import tempfile
 from pathlib import Path
+from typing import Any
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
+from bacterioscope.api.lab import router as lab_router
 from bacterioscope.api.schemas import AnalyzeResponse, DiskAnalysisItem, HealthResponse
 from bacterioscope.pipeline import BacterioScopePipeline, PipelineConfig
 
@@ -53,6 +57,37 @@ app = FastAPI(
 )
 
 _pipeline: BacterioScopePipeline | None = None
+
+with contextlib.suppress(ImportError):
+    from dotenv import load_dotenv
+
+    load_dotenv(Path(__file__).resolve().parents[3] / ".env", override=False)
+
+_WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+_CSP = (
+    "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; "
+    "font-src https://fonts.gstatic.com; img-src 'self' blob: data:; connect-src 'self'; "
+    "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+)
+
+app.include_router(lab_router)
+app.mount("/static", StaticFiles(directory=_WEB_DIR), name="static")
+
+
+@app.middleware("http")
+async def _security_headers(request: Request, call_next: Any) -> Response:
+    response: Response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    if response.headers.get("content-type", "").startswith("text/html"):
+        response.headers.setdefault("Content-Security-Policy", _CSP)
+    return response
+
+
+@app.get("/", include_in_schema=False)
+def web_app() -> FileResponse:
+    """Serve the light-box lab-review web app."""
+    return FileResponse(_WEB_DIR / "index.html")
 
 
 def _get_pipeline() -> BacterioScopePipeline:

@@ -13,7 +13,8 @@ htmlcov/
 .env
 .env.*
 tests/
-docs/
+docs/*
+!docs/contracts
 notebooks/
 data/raw/
 data/processed/
