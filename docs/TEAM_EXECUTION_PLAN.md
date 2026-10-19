@@ -34,8 +34,33 @@
 - **P2 / Luis, continued (2026-10-12):** merged three more PRs. `#4` made Dryad extraction/ground-truth reproducible end to end. `#5` hardened the `review_plate()` boundary: `rule_standard` is now independent of `measurement.standard` (caller-overridable), disks carrying any pipeline quality flag are excluded from rule evaluation (not just UNKNOWN/duplicate), the ESBL screen now runs when the caller supplies an explicit edition and typed disk/assay observations, and optional live INS/OPS Tavily search was added to `review_plate()` with an explicit `alert_search_status` field (`not_requested`/`provided`/`available`/`no_results`/`partial`/`unavailable`). `#7` added a derived, clearly-non-independent Ed33 category sidecar for the UZH measurements (`data/processed/uzh_derived_clsi_ed33_labels.csv`, `docs/CLSI_ED33_GROUND_TRUTH_AUDIT.md`) -- every row carries `independent_ground_truth=false` and the doc explicitly forbids using it to claim categorical validation, since it applies the project's own classifier to its own reference diameters. Full suite after all three: 425 passed, ruff/mypy/bandit clean (Esteban verified independently, not just trusted the PR).
   - **Flag for Esteban/Paula:** `#5`'s companion work (really landed in the Ed33 groundtruth change) corrected four CLSI M100-Ed33 breakpoint values in `classification/clsi.py` itself -- gentamicin (S>=15 -> S>=18), amikacin (S>=17 -> S>=20), piperacillin-tazobactam (added an SDD category, S>=21 -> S>=25), cefepime (I relabeled SDD, same numeric range). Cited with FDA/CLSI sources in `docs/CLSI_ED33_GROUND_TRUTH_AUDIT.md`, but not mentioned in the commit message or PR #5 description -- found only by reading the diff directly. Does not affect the published EA/MAE pitch numbers (those are mm-based, not category-based), but is the real clinical classifier now live; Paula should confirm the four values against the actual Ed33 table before the team relies on S/I/R output in the final demo.
 - **Milestone check -- Mon 12 Oct ("end-to-end agent and deterministic tool flow works on demo plates"): met.** Luis ran `review_plate()` against a synthetic demo plate with his own configured `NEBIUS_API_KEY` and got back a real `status: "grounded_report"` with a coherent, grounded `model_explanation` and two real Tavily alerts attached (`alert_search_status: "available"`). All six disks on that particular image were correctly excluded from rule evaluation by their quality flags (small/low-circularity zones) -- working as designed, not a bug, but it means that specific image is not a good choice for demonstrating a rule finding; pick cleaner demo data for that purpose. Esteban does not yet have his own `NEBIUS_API_KEY` configured locally (checked 2026-10-12); only Luis's works today.
-- **P3 / Daniel:** no branch or PR yet as of 2026-10-12. Can start Docker/job scaffolding now against the frozen `review_plate()` signature and `agent-review-v1` schema (both stable across Esteban's and Luis's merges). Must not treat UZH/EUCAST labels, including the new Ed33-derived sidecar, as CLSI categorical ground truth.
-- **P4 / Sebastian:** no branch or PR yet as of 2026-10-12. Can build report states for "rules unavailable," the new `alert_search_status` states, ESBL screen states, and human review. Do not display draft or synthetic test rules as clinical content.
+- **P3 / evaluation (taken over by Esteban, 2026-10-17, branch `feat/eval`, PR #10):**
+  - **Deterministic synthetic benchmark** (`evaluation/synthetic_benchmark.py`). The truth comes from the generator geometry (`examples/synthetic/ground_truth.json`). Results:
+    - detection: 54/54 disks, 8/8 plates with an exact disk count;
+    - measurement: EA 59.3%, MAE 3.04 mm;
+    - unflagged disks: EA 82.1%, with 0 VME/ME on 28 disks;
+    - all 3 dangerous errors fall on flagged disks (12-disk confluence).
+  - **Agent benchmark** (`evaluation/agent_benchmark.py`):
+    - routed vs Ultra-only, with the same alerts fed to both modes;
+    - real token counts and latency per call;
+    - no hardcoded prices.
+  - **Runner:** `scripts/run_evaluation.py`.
+  - **Docker:** the image runs the benchmark in CI.
+  - **`agent-eval.yml`:** manual dispatch, using repo secrets.
+  - These are synthetic-plate numbers, not clinical validation. Never present the Ed33-derived UZH sidecar as CLSI categorical ground truth.
+- **P4 / UI (taken over by Esteban, 2026-10-18):** the light-box web app is served by FastAPI at `/` (`src/bacterioscope/web/`, `api/lab.py`).
+  - **Reading and correction:**
+    - every zone drawn on the photograph;
+    - per-antibiotic CLSI rulers;
+    - drag-to-correct with live category, and traced corrections that block the agent review;
+    - a 3x edge loupe with an mm scale.
+  - **Report:**
+    - every report state (`grounded_report`/fallback, catalog status, `alert_search_status`, ESBL off);
+    - INS/OPS alerts;
+    - reviewer sign-off and JSON download.
+  - **Usability:** bilingual ES/EN and responsive to phone width.
+  - **Design process:** built through the Impeccable workflow, passed a finish review after 3 fix rounds, and is documented in `DESIGN.md`.
+  - **Still open for delivery:** public deployment with keys as secrets, the architecture diagram, the 3-minute video, and Devpost.
 - The previous geometry-only education pack is retained as a separate draft artifact, not Luis's current P2 deliverable or the primary product route.
 
 ## Team workflow

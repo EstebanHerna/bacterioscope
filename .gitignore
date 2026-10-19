@@ -65,3 +65,8 @@ colab/*.zip
 
 *.log
 
+
+# Impeccable design-review captures and local hook state
+.impeccable/review/
+.impeccable/questions/
+.impeccable/hook.cache.json

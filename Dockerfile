@@ -20,6 +20,7 @@ COPY scripts/ scripts/
 COPY panels/ panels/
 COPY docs/contracts/ docs/contracts/
 COPY examples/synthetic/ examples/synthetic/
+COPY examples/real/real_plate_box4.jpg examples/real/
 
 RUN pip install --no-cache-dir -e ".[api,agent]" \
     && chown -R bacterio:bacterio /app

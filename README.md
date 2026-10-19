@@ -154,7 +154,36 @@ Definitions per ISO 20776-2 / FDA criteria for AST systems.
 
 ---
 
-## Try the demo
+## Light-box web app
+
+![BacterioScope light box: a corrected zone on a synthetic plate, with per-antibiotic rulers and the edge loupe](docs/lightbox_demo.jpg)
+
+The main interface is a reading screen served by the FastAPI app itself (no separate front-end build):
+
+```bash
+pip install -e ".[api,agent]"
+uvicorn bacterioscope.api.routes:app --port 8000
+```
+
+Open `http://localhost:8000`. The screen is a black reading box (CLSI M02 reads plates against a black, non-reflective background):
+
+- **Every zone is drawn on the photograph.** Each one gets its contour, the measured caliper circle, and a tag with code, diameter and S/I/R. Measurements the system does not trust are hatched in olive.
+- **One ruler per antibiotic.** Each ruler shows its CLSI M100-Ed33 R/I/S segments, the measured diameter, and a ±2 mm band that marks readings close to a breakpoint.
+- **Corrections are drag-to-fix.** Drag a zone's handle, or use the arrow keys, to correct its diameter. The category recomputes live, and the server confirms it. A 3× loupe on the zone edge carries its own millimetre scale. Every correction is traced, and the agent review stays blocked until corrections are restored, because the report cannot yet trace a corrected diameter.
+- **Review with Nemotron** produces a narrative validated against the evidence. Without a Nebius key it falls back to the complete deterministic report. The INS/OPS public alerts are optional. The reviewer signs, then downloads the JSON report.
+- **The interface is bilingual (ES/EN)** and works on a phone.
+
+Direct links for demos:
+
+| Link | What it opens |
+|---|---|
+| `/?sample=plate_mixed_sir&lang=es` | Synthetic 6-disk plate, Spanish |
+| `/?sample=real_plate_box4&lang=en` | Real 16-disk photograph, English |
+| `/?sample=plate_esbl_like&lang=es&review=1` | Synthetic plate with the review already run |
+
+The same image runs with Docker: `docker build -t bacterioscope . && docker run -p 8000:8000 --env-file .env bacterioscope`.
+
+## Try the Streamlit prototype
 
 ```bash
 git clone https://github.com/EstebanHerna/bacterioscope.git
@@ -199,8 +228,8 @@ result.
 Set `NEBIUS_API_KEY`, `TAVILY_API_KEY`, and the exact account-visible model IDs
 (`NEBIUS_MODEL_NANO`, `NEBIUS_MODEL_SUPER`, `NEBIUS_MODEL_ULTRA`) in the local
 `.env`. Never commit that file. This smoke check exercises provider access; it
-does not imply that the current Streamlit UI includes the agent review panel or
-that the prototype is validated for clinical use.
+does not imply that the prototype is validated for clinical use. The agent
+review panel lives in the light-box web app, not in the Streamlit prototype.
 
 ---
 
@@ -282,8 +311,10 @@ bacterioscope/
 │   ├── panels/
 │   │   └── manager.py       <- PanelManager: load YAML, assign by angular position
 │   ├── api/
-│   │   ├── routes.py        <- FastAPI endpoints
+│   │   ├── routes.py        <- FastAPI endpoints, serves the web app at /
+│   │   ├── lab.py           <- light-box API: plates, classify, panel, agent review
 │   │   └── schemas.py       <- Pydantic schemas
+│   ├── web/                 <- light-box front end (HTML/CSS/JS, no build step)
 │   └── utils/
 │       ├── calibration.py   <- plate rim detection -> px/mm
 │       └── visualization.py <- annotated image output
