@@ -20,6 +20,7 @@ printed.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import subprocess  # nosec B404
@@ -179,11 +180,13 @@ def _render_report(results: dict[str, Any]) -> str:
         f"{det['categorical_flagged']['very_major'] + det['categorical_flagged']['major']}"
         f" of {det['categorical_flagged']['n']} |",
         "",
-        "The drawn frame is the reference: the generator draws the plate rim with a "
-        "252 px radius, which the pipeline calibrates as 90 mm, while the scenario "
-        "table's nominal values assume a different scale and run ~6% larger. Categories "
-        "on both sides come from the same CLSI Ed33 classifier, so they isolate "
-        "measurement error; SDD is treated like I.",
+        (
+            "The drawn frame is the reference: the generator draws the plate rim with a "
+            "252 px radius, which the pipeline calibrates as 90 mm, while the scenario "
+            "table's nominal values assume a different scale and run ~6% larger. Categories "
+            "on both sides come from the same CLSI Ed33 classifier, so they isolate "
+            "measurement error; SDD is treated like I."
+        ),
         "",
     ]
     live = results.get("live")
@@ -193,11 +196,15 @@ def _render_report(results: dict[str, Any]) -> str:
     lines += [
         "## Stage 2 -- live agent on Nebius Token Factory",
         "",
-        f"Models resolved from the live catalog: `{live['models']}`. "
-        f"Alerts: {live['alerts'] or 'not requested'}.",
+        (
+            f"Models resolved from the live catalog: `{live['models']}`. "
+            f"Alerts: {live['alerts'] or 'not requested'}."
+        ),
         "",
-        "| Mode | Grounded | p50 / p95 latency | Prompt / completion tokens | Tier mix "
-        "| Cost per plate |",
+        (
+            "| Mode | Grounded | p50 / p95 latency | Prompt / completion tokens | Tier mix "
+            "| Cost per plate |"
+        ),
         "|---|---|---|---|---|---|",
     ]
     for mode, s in live["summary"].items():
@@ -230,12 +237,10 @@ def main() -> int:
     parser.add_argument("--prices", type=str, default=None)
     args = parser.parse_args()
 
-    try:
+    with contextlib.suppress(ImportError):
         from dotenv import load_dotenv
 
         load_dotenv(REPO_ROOT / ".env", override=False)
-    except ImportError:
-        pass
 
     print("Stage 1: deterministic synthetic benchmark")
     deterministic, labeled = _deterministic_stage(args.truth)

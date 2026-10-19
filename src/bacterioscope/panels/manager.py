@@ -75,10 +75,11 @@ class PanelManager:
         Raises:
             FileNotFoundError: When no matching YAML file exists.
         """
-        path = self._dir / f"{name}.yaml"
-        if not path.exists():
+        existing = self._dir.glob("*.yaml") if self._dir.exists() else []
+        matches = [p for p in existing if p.stem == name]
+        if not matches:
             raise FileNotFoundError(f"Panel '{name}' not found in {self._dir}")
-        with path.open(encoding="utf-8") as fh:
+        with matches[0].open(encoding="utf-8") as fh:
             data = yaml.safe_load(fh)
         disks = sorted(data["disks"], key=lambda d: int(d["position"]))
         return PanelConfig(

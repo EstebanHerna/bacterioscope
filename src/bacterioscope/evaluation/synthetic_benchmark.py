@@ -36,7 +36,6 @@ if TYPE_CHECKING:
 
 EA_MARGIN_MM = 2.0
 _MATCH_TOLERANCE_PX = 22.0
-_INTERMEDIATE_LIKE = frozenset({"I", "SDD"})
 _CATEGORIZED = frozenset({"S", "I", "SDD", "R"})
 
 

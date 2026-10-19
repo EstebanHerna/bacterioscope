@@ -28,6 +28,7 @@ Run with:
 
 from __future__ import annotations
 
+import contextlib
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -57,12 +58,10 @@ app = FastAPI(
 
 _pipeline: BacterioScopePipeline | None = None
 
-try:
+with contextlib.suppress(ImportError):
     from dotenv import load_dotenv
 
     load_dotenv(Path(__file__).resolve().parents[3] / ".env", override=False)
-except ImportError:
-    pass
 
 _WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 _CSP = (
