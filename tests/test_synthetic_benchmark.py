@@ -114,6 +114,17 @@ class TestSummarize:
         cat = summarize([plate])["categorical"]
         assert (cat["n"], cat["excluded_uncategorized"], cat["ca"]) == (0, 1, None)
 
+    def test_discordances_are_listed_most_severe_first(self) -> None:
+        disks = (_outcome("S", "I"), _outcome("S", "S"), _outcome("R", "S", ("overlap",)))
+        rows = summarize([PlateOutcome("p.png", 3, 3, disks, ())])["discordances"]
+        assert [row["error"] for row in rows] == ["very_major", "minor"]
+        assert rows[0]["flags"] == ["overlap"]
+
+    def test_per_plate_counts_flagged_disks(self) -> None:
+        disks = (_outcome("S", "S", ("overlap",)), _outcome("S", "S"))
+        row = summarize([PlateOutcome("p.png", 2, 2, disks, ())])["per_plate"][0]
+        assert (row["matched"], row["flagged"]) == (2, 1)
+
 
 class TestGroundTruthFile:
     def test_loads_all_plates(self) -> None:

@@ -265,6 +265,49 @@ def _categorical_block(disks: Sequence[DiskOutcome]) -> dict[str, Any]:
     }
 
 
+def discordances(disks: Sequence[DiskOutcome]) -> list[dict[str, Any]]:
+    """List every detected disk whose measured category differs from the reference.
+
+    Args:
+        disks: Disk outcomes from any number of plates.
+
+    Returns:
+        One dict per discordant disk, most severe first: plate, antibiotic,
+        reference and measured diameters, both categories, the ISO 20776-2
+        error class and the pipeline's quality flags.
+    """
+    rank = {"very_major": 0, "major": 1, "minor": 2}
+    rows = [
+        {
+            "image": d.image, "antibiotic": d.antibiotic,
+            "reference_mm": round(d.reference_mm, 2), "measured_mm": round(d.measured_mm, 2),
+            "reference_category": d.reference_category,
+            "predicted_category": d.predicted_category,
+            "error": _error_class(d.reference_category, d.predicted_category),
+            "flags": list(d.flags),
+        }
+        for d in disks
+        if d.measured_mm is not None and d.predicted_category in _CATEGORIZED
+        and d.reference_category in _CATEGORIZED
+        and d.predicted_category != d.reference_category
+    ]
+    return sorted(rows, key=lambda row: (rank[row["error"]], row["image"]))
+
+
+def _plate_row(plate: PlateOutcome) -> dict[str, Any]:
+    detected = [d for d in plate.disks if d.detected]
+    block = _measurement_block(detected, "drawn")
+    return {
+        "image": plate.image,
+        "true_disks": plate.n_true,
+        "detections": plate.n_detected,
+        "matched": len(detected),
+        "flagged": sum(1 for d in detected if d.flags),
+        **{key: block[key] for key in ("ea", "mae_mm", "bias_mm")},
+        "ca": _categorical_block(list(plate.disks))["ca"],
+    }
+
+
 def summarize(plates: Sequence[PlateOutcome]) -> dict[str, Any]:
     """Aggregate per-plate outcomes into the benchmark's headline metrics.
 
@@ -273,7 +316,8 @@ def summarize(plates: Sequence[PlateOutcome]) -> dict[str, Any]:
 
     Returns:
         Dict with ``detection``, ``measurement`` (drawn and nominal frames,
-        plus flagged/unflagged splits), ``categorical`` and ``per_plate``.
+        plus flagged/unflagged splits), ``categorical``, ``per_plate`` and
+        ``discordances``.
     """
     disks = [d for plate in plates for d in plate.disks]
     detected = [d for d in disks if d.detected]
@@ -301,18 +345,6 @@ def summarize(plates: Sequence[PlateOutcome]) -> dict[str, Any]:
         "categorical": _categorical_block(detected),
         "categorical_unflagged": _categorical_block(unflagged),
         "categorical_flagged": _categorical_block(flagged),
-        "per_plate": [
-            {
-                "image": p.image,
-                "true_disks": p.n_true,
-                "detections": p.n_detected,
-                "matched": sum(d.detected for d in p.disks),
-                **{
-                    key: _measurement_block([d for d in p.disks if d.detected], "drawn")[key]
-                    for key in ("ea", "mae_mm", "bias_mm")
-                },
-                "ca": _categorical_block(list(p.disks))["ca"],
-            }
-            for p in plates
-        ],
+        "per_plate": [_plate_row(p) for p in plates],
+        "discordances": discordances(detected),
     }
