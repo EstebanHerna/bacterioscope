@@ -47,6 +47,7 @@
   - **Runner:** `scripts/run_evaluation.py`.
   - **Docker:** the image runs the benchmark in CI.
   - **`agent-eval.yml`:** manual dispatch, using repo secrets.
+  - **First live run (2026-10-19, commit `11d8f1a`, merged to main as PR #10):** 16/16 grounded reports (8 routed, 8 Ultra-only), median latency about 2.3-2.6 s per plate. Routed used Super on every plate and never escalated, because no expert rules are enabled and the ESBL screen needs disk potency. It used 0.74x Ultra's completion tokens. Full tables in `docs/EVALUATION_REPORT.md`.
   - These are synthetic-plate numbers, not clinical validation. Never present the Ed33-derived UZH sidecar as CLSI categorical ground truth.
 - **P4 / UI (taken over by Esteban, 2026-10-18):** the light-box web app is served by FastAPI at `/` (`src/bacterioscope/web/`, `api/lab.py`).
   - **Reading and correction:**
