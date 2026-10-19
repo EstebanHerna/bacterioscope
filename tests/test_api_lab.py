@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from bacterioscope.api import lab
+from bacterioscope import plate_session
 from bacterioscope.api.routes import app
 
 _SAMPLE = "plate_mixed_sir"
@@ -28,7 +28,7 @@ def plate(client: TestClient) -> dict[str, Any]:
 @pytest.fixture(autouse=True)
 def _no_live_providers(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("NEBIUS_API_KEY", "")
-    monkeypatch.setattr(lab, "_models", None)
+    monkeypatch.setattr(plate_session, "_models", None)
 
 
 class TestWebApp:

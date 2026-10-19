@@ -82,6 +82,9 @@ bacterioscope/
         cli.py                     <- CLI entry point (Typer)
         app.py                     <- Streamlit demo
         _app_logic.py              <- pure helpers with no Streamlit import (testable without UI)
+        plate_session.py           <- review sessions (LRU, labels, corrections, agent review) shared
+                                       by api/lab.py and mcp_server.py; raises domain errors only
+        mcp_server.py              <- MCP server (FastMCP, `bacterioscope-mcp`), disks by clockwise position
         design/
             tokens.py               <- Clinical Slate palette/typography tokens (single source of color)
         detection/

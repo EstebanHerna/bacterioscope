@@ -1,0 +1,48 @@
+<!--
+  Evaluation questions for the BacterioScope MCP server (src/bacterioscope/mcp_server.py).
+  Each answer was verified by calling the tools on 2026-10-18. Breakpoint questions depend
+  only on the CLSI M100-Ed33 table; plate questions depend on the bundled synthetic samples
+  and the current pipeline, so re-verify them after any detection or segmentation change.
+-->
+<evaluation>
+  <qa_pair>
+    <question>In the 12-disk Enterobacteriaceae panel, take the antibiotic at clockwise position 7. What is its susceptible (S) zone-diameter breakpoint in mm?</question>
+    <answer>23</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>A 21 mm zone is measured for the antibiotic at position 4 of the 6-disk Enterobacteriaceae panel. Which CLSI category does it fall into?</question>
+    <answer>I</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>A cefepime zone measures 22.4 mm. Which CLSI category applies after whole-millimetre rounding?</question>
+    <answer>SDD</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Among the antibiotics with a susceptible-dose-dependent range, which one has the widest SDD range in millimetres?</question>
+    <answer>cefepime</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>How many of the antibiotics in the breakpoint table have a susceptible breakpoint of exactly 23 mm?</question>
+    <answer>4</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Analyze the bundled sample plate_carbapenem_resistant. How many of its disks are classified R?</question>
+    <answer>6</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Analyze the bundled sample plate_12disk_panel. Give the CLSI code of the only disk classified I.</question>
+    <answer>LVX</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Run the review of the bundled sample plate_esbl_like without public alerts. How many disks are excluded from expert-rule evaluation?</question>
+    <answer>2</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Analyze plate_mixed_sir, then correct the ciprofloxacin zone to 26 mm. Which category does ciprofloxacin get after the correction?</question>
+    <answer>S</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>What is the resistant (R) breakpoint in mm for the last antibiotic of the 6-disk Enterobacteriaceae panel?</question>
+    <answer>10</answer>
+  </qa_pair>
+</evaluation>

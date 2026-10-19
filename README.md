@@ -275,6 +275,33 @@ curl -X POST http://localhost:8000/analyze -F "image=@plate.jpg"
 
 Interactive API docs at `http://localhost:8000/docs`.
 
+### MCP server
+
+The same workflow is available to MCP clients such as Claude Desktop, Claude Code and other agents. The server runs over stdio by default:
+
+```bash
+pip install -e ".[mcp,agent]"
+bacterioscope-mcp                                    # stdio
+bacterioscope-mcp --transport streamable-http        # http://127.0.0.1:8765/mcp
+```
+
+| Tool | What it does |
+|---|---|
+| `bacterioscope_analyze_plate` | Detects disks on a local photo or bundled sample and measures each zone. Takes antibiotics in clockwise order, or a panel. |
+| `bacterioscope_update_plate` | Assigns antibiotics or corrects diameters by clockwise position. A correction blocks the review until it is cleared. |
+| `bacterioscope_review_plate` | Runs the grounded Nemotron review (with deterministic fallback), with optional INS/OPS alerts. |
+| `bacterioscope_classify_zone` | Classifies one diameter as S/SDD/I/R under CLSI M100-Ed33 for Enterobacterales. |
+| `bacterioscope_get_breakpoints` | Returns the breakpoint table used, accepting names or codes (`CIP`, `MEM`, ...). |
+| `bacterioscope_list_samples` / `bacterioscope_list_panels` | Lists the bundled sample plates and the fixed disk panels. |
+
+Claude Code: `claude mcp add bacterioscope -- bacterioscope-mcp`. Claude Desktop (`claude_desktop_config.json`):
+
+```json
+{ "mcpServers": { "bacterioscope": { "command": "bacterioscope-mcp" } } }
+```
+
+The server reads `NEBIUS_API_KEY` and `TAVILY_API_KEY` from the environment or from the repository `.env`. Without them, the review still returns the complete deterministic report. Ten verified evaluation questions live in `docs/MCP_EVALUATION.xml`.
+
 ### Python API
 
 ```python
@@ -315,6 +342,8 @@ bacterioscope/
 │   │   ├── lab.py           <- light-box API: plates, classify, panel, agent review
 │   │   └── schemas.py       <- Pydantic schemas
 │   ├── web/                 <- light-box front end (HTML/CSS/JS, no build step)
+│   ├── plate_session.py     <- review sessions shared by the web API and the MCP server
+│   ├── mcp_server.py        <- MCP server (bacterioscope-mcp)
 │   └── utils/
 │       ├── calibration.py   <- plate rim detection -> px/mm
 │       └── visualization.py <- annotated image output
