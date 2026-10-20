@@ -1,0 +1,38 @@
+name: Nebius job script check
+
+# Validates scripts/run_nebius_eval_job.py in CI. This does NOT launch a real
+# Nebius job: step 2 never passes --execute, so the script only assembles and
+# prints the `nebius ai job create` command (secrets masked) without running
+# it. Manual dispatch only.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Self-check (no network, no env required)
+        run: python scripts/run_nebius_eval_job.py --self-check
+
+      - name: Dry-run command assembly (never --execute)
+        env:
+          NEBIUS_API_KEY: ${{ secrets.NEBIUS_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          NEBIUS_MODEL_NANO: ${{ vars.NEBIUS_MODEL_NANO }}
+          NEBIUS_MODEL_SUPER: ${{ vars.NEBIUS_MODEL_SUPER }}
+          NEBIUS_MODEL_ULTRA: ${{ vars.NEBIUS_MODEL_ULTRA }}
+        run: |
+          python scripts/run_nebius_eval_job.py \
+            --platform gpu-l40s-d \
+            --preset 1gpu-8vcpu-32gb
