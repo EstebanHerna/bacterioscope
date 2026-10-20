@@ -3,10 +3,18 @@ name: Nebius job script check
 # Validates scripts/run_nebius_eval_job.py in CI. This does NOT launch a real
 # Nebius job: step 2 never passes --execute, so the script only assembles and
 # prints the `nebius ai job create` command (secrets masked) without running
-# it. Manual dispatch only.
+# it.
+#
+# Push trigger is scoped to this branch only: workflow_dispatch requires the
+# workflow file to already exist on the default branch to be invokable via
+# API/UI, which defeats testing it before merging. Remove the push trigger
+# once this is merged to main and workflow_dispatch alone is enough.
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - infra/nebius-eval-job
 
 permissions:
   contents: read
