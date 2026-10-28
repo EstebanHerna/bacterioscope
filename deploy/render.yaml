@@ -1,0 +1,17 @@
+# Render blueprint for the BacterioScope public demo.
+# Render builds the repository Dockerfile and runs the FastAPI image on one
+# port. Create the two secrets in the Render dashboard (sync: false keeps them
+# out of this file and out of git); never paste key values here.
+services:
+  - type: web
+    name: bacterioscope
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    numInstances: 1
+    healthCheckPath: /
+    envVars:
+      - key: NEBIUS_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
